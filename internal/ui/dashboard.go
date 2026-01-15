@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"context"
 	"fmt"
+	"image/color"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,9 +15,14 @@ import (
 type Dashboard struct {
 	app           *docker.Application
 	width, height int
+	upgrading     bool
 }
 
 type dashboardTickMsg struct{}
+
+type upgradeFinishedMsg struct {
+	err error
+}
 
 func NewDashboard(app *docker.Application) Dashboard {
 	return Dashboard{
@@ -31,6 +38,13 @@ func (m Dashboard) Update(msg tea.Msg) (Component, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyMsg:
+		if msg.String() == "u" && !m.upgrading {
+			m.upgrading = true
+			return m, m.runUpgrade()
+		}
+	case upgradeFinishedMsg:
+		m.upgrading = false
 	case dashboardTickMsg:
 		return m, tea.Tick(time.Second, func(time.Time) tea.Msg { return dashboardTickMsg{} })
 	}
@@ -40,23 +54,40 @@ func (m Dashboard) Update(msg tea.Msg) (Component, tea.Cmd) {
 func (m Dashboard) View() string {
 	title := Styles.Title.Width(m.width).Align(lipgloss.Center).Render(m.app.Settings.Name)
 
-	status := "stopped"
-	statusColor := lipgloss.Color("#ff5555")
-	if m.app.Running {
+	var status string
+	var statusColor color.Color
+	if m.upgrading {
+		status = "upgrading..."
+		statusColor = lipgloss.Color("#f1fa8c")
+	} else if m.app.Running {
 		status = "running"
 		statusColor = lipgloss.Color("#50fa7b")
+	} else {
+		status = "stopped"
+		statusColor = lipgloss.Color("#ff5555")
 	}
 
 	stateStyle := lipgloss.NewStyle().Foreground(statusColor)
 	stateDisplay := fmt.Sprintf("State: %s", stateStyle.Render(status))
 
-	if m.app.Running && !m.app.RunningSince.IsZero() {
+	if m.app.Running && !m.app.RunningSince.IsZero() && !m.upgrading {
 		stateDisplay += fmt.Sprintf(" (up %s)", formatDuration(time.Since(m.app.RunningSince)))
 	}
 
 	content := lipgloss.NewStyle().PaddingLeft(2).Render(stateDisplay)
 
-	return title + "\n\n" + content
+	hint := lipgloss.NewStyle().Foreground(lipgloss.Color("#6272a4")).PaddingLeft(2).Render("Press U to upgrade")
+
+	return title + "\n\n" + content + "\n\n" + hint
+}
+
+// Private
+
+func (m Dashboard) runUpgrade() tea.Cmd {
+	return func() tea.Msg {
+		err := m.app.Update(context.Background(), nil)
+		return upgradeFinishedMsg{err: err}
+	}
 }
 
 // Helpers

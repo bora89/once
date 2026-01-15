@@ -112,6 +112,10 @@ func (a *Application) Start(ctx context.Context) error {
 	return a.namespace.client.ContainerStart(ctx, name, container.StartOptions{})
 }
 
+func (a *Application) Update(ctx context.Context, progress DeployProgressCallback) error {
+	return a.Deploy(ctx, progress)
+}
+
 func (a *Application) Deploy(ctx context.Context, progress DeployProgressCallback) error {
 	reader, err := a.namespace.client.ImagePull(ctx, a.Settings.Image, image.PullOptions{})
 	if err != nil {
