@@ -49,13 +49,6 @@ func NewApp(ns *docker.Namespace) App {
 
 	apps := ns.Applications()
 
-	var screen Component
-	if len(apps) > 0 {
-		screen = NewDashboard(apps[0])
-	} else {
-		screen = NewEmptyState()
-	}
-
 	metricsPort := docker.DefaultMetricsPort
 	if ns.Proxy().Settings != nil && ns.Proxy().Settings.MetricsPort != 0 {
 		metricsPort = ns.Proxy().Settings.MetricsPort
@@ -65,6 +58,13 @@ func NewApp(ns *docker.Namespace) App {
 		Port: metricsPort,
 	})
 	scraper.Start(ctx)
+
+	var screen Component
+	if len(apps) > 0 {
+		screen = NewDashboard(apps[0], scraper)
+	} else {
+		screen = NewEmptyState()
+	}
 
 	return App{
 		namespace:     ns,
@@ -99,7 +99,7 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_ = m.namespace.Refresh(m.watchCtx)
 		apps := m.namespace.Applications()
 		if len(apps) > 0 && m.currentIndex < len(apps) {
-			m.currentScreen = NewDashboard(apps[m.currentIndex])
+			m.currentScreen = NewDashboard(apps[m.currentIndex], m.scraper)
 			m.currentScreen, _ = m.currentScreen.Update(m.lastSize)
 		}
 		return m, tea.Batch(m.currentScreen.Init(), m.watchForChanges())
@@ -147,7 +147,7 @@ func (m App) switchApp(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	m.currentIndex = newIndex
-	m.currentScreen = NewDashboard(apps[newIndex])
+	m.currentScreen = NewDashboard(apps[newIndex], m.scraper)
 	m.currentScreen, _ = m.currentScreen.Update(m.lastSize)
 	return m, m.currentScreen.Init()
 }

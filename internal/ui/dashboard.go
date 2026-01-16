@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image/color"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/basecamp/amar/internal/docker"
+	"github.com/basecamp/amar/internal/metrics"
 )
 
 type dashboardKeyMap struct {
@@ -39,10 +41,81 @@ var dashboardKeys = dashboardKeyMap{
 
 type Dashboard struct {
 	app           *docker.Application
+	scraper       *metrics.MetricsScraper
 	width, height int
 	upgrading     bool
 	progress      ProgressBusy
 	help          help.Model
+	allReqChart   RequestRateChart
+	errorChart    RequestRateChart
+}
+
+type RequestRateChart struct {
+	scraper    *metrics.MetricsScraper
+	service    string
+	title      string
+	onlyErrors bool
+	width      int
+	height     int
+	data       []float64
+}
+
+func NewRequestRateChart(scraper *metrics.MetricsScraper, service, title string, onlyErrors bool) RequestRateChart {
+	return RequestRateChart{
+		scraper:    scraper,
+		service:    service,
+		title:      title,
+		onlyErrors: onlyErrors,
+	}
+}
+
+func (c *RequestRateChart) SetSize(width, height int) {
+	c.width = width
+	c.height = height
+}
+
+func (c *RequestRateChart) Update() {
+	samples := c.scraper.FetchAverage(c.service, 200, 12)
+
+	c.data = make([]float64, len(samples))
+	for i, s := range samples {
+		if c.onlyErrors {
+			c.data[i] = float64(s.ServerErrors)
+		} else {
+			c.data[i] = float64(s.Success + s.ClientErrors + s.ServerErrors)
+		}
+	}
+
+	// Reverse so most recent is on the right
+	slices.Reverse(c.data)
+}
+
+func (c RequestRateChart) View() string {
+	// Ensure data fills the chart width (each chart char = 2 data points)
+	dataPoints := c.width * 2
+	data := c.data
+	if len(data) < dataPoints {
+		padded := make([]float64, dataPoints)
+		copy(padded[dataPoints-len(data):], data)
+		data = padded
+	} else if len(data) > dataPoints {
+		data = data[len(data)-dataPoints:]
+	}
+
+	chart := Chart{
+		Width:  c.width,
+		Height: c.height,
+		Data:   data,
+		Title:  c.title,
+	}
+
+	if c.onlyErrors {
+		chart.Color = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555"))
+	} else {
+		chart.Color = lipgloss.NewStyle().Foreground(lipgloss.Color("#50fa7b"))
+	}
+
+	return chart.View()
 }
 
 type dashboardTickMsg struct{}
@@ -51,10 +124,14 @@ type upgradeFinishedMsg struct {
 	err error
 }
 
-func NewDashboard(app *docker.Application) Dashboard {
+func NewDashboard(app *docker.Application, scraper *metrics.MetricsScraper) Dashboard {
+	service := app.Settings.Name
 	return Dashboard{
-		app:  app,
-		help: help.New(),
+		app:         app,
+		scraper:     scraper,
+		help:        help.New(),
+		allReqChart: NewRequestRateChart(scraper, service, "Requests/min", false),
+		errorChart:  NewRequestRateChart(scraper, service, "Errors/min", true),
 	}
 }
 
@@ -70,6 +147,12 @@ func (m Dashboard) Update(msg tea.Msg) (Component, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.progress = NewProgressBusy(m.width, lipgloss.Color("#6272a4"))
 		m.help.SetWidth(m.width)
+
+		chartWidth := m.width / 2
+		chartHeight := 20
+		m.allReqChart.SetSize(chartWidth, chartHeight)
+		m.errorChart.SetSize(chartWidth, chartHeight)
+
 		if m.upgrading {
 			cmds = append(cmds, m.progress.Init())
 		}
@@ -82,6 +165,8 @@ func (m Dashboard) Update(msg tea.Msg) (Component, tea.Cmd) {
 	case upgradeFinishedMsg:
 		m.upgrading = false
 	case dashboardTickMsg:
+		m.allReqChart.Update()
+		m.errorChart.Update()
 		cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg { return dashboardTickMsg{} }))
 	case progressBusyTickMsg:
 		if m.upgrading {
@@ -119,6 +204,9 @@ func (m Dashboard) View() string {
 
 	content := lipgloss.NewStyle().PaddingLeft(2).Render(stateDisplay)
 
+	// Charts side by side
+	charts := lipgloss.JoinHorizontal(lipgloss.Top, m.allReqChart.View(), m.errorChart.View())
+
 	// Help string (last line, centered)
 	helpView := m.help.View(dashboardKeys)
 	helpLine := lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(helpView)
@@ -132,7 +220,7 @@ func (m Dashboard) View() string {
 	}
 
 	// Calculate available height for main content
-	topContent := title + "\n\n" + content
+	topContent := title + "\n\n" + content + "\n\n" + charts
 
 	topHeight := lipgloss.Height(topContent)
 	bottomHeight := lipgloss.Height(bottomContent)

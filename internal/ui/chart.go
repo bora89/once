@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -14,6 +15,7 @@ type Chart struct {
 	Height int
 	Data   []float64
 	Color  lipgloss.Style
+	Title  string
 }
 
 // braille bit patterns for left and right columns
@@ -40,33 +42,54 @@ func (c Chart) View() string {
 	}
 
 	maxVal := c.maxValue()
+	displayMax := maxVal
 	if maxVal == 0 {
 		maxVal = 1
+	}
+
+	// Format labels and calculate label width
+	maxLabel := formatChartValue(displayMax)
+	labelWidth := max(len(maxLabel), 1)
+	chartWidth := c.Width - labelWidth - 1 // -1 for space between label and chart
+
+	if chartWidth <= 0 {
+		return ""
 	}
 
 	// Each character row represents 4 vertical dots
 	dotsHeight := c.Height * 4
 
 	// Calculate the height in dots for each data point
+	// Always show at least 1 dot so zeros are visible
 	heights := make([]int, len(c.Data))
 	for i, v := range c.Data {
 		heights[i] = int((v / maxVal) * float64(dotsHeight))
-		if v > 0 && heights[i] == 0 {
-			heights[i] = 1 // ensure non-zero values show at least 1 dot
+		if heights[i] == 0 {
+			heights[i] = 1 // show at least 1 dot for all values including zero
 		}
 	}
 
+	var output []string
+
+	// Title line (centered over full width)
+	if c.Title != "" {
+		titleLine := lipgloss.NewStyle().Width(c.Width).Align(lipgloss.Center).Render(c.Title)
+		output = append(output, titleLine)
+	}
+
 	// Build the chart row by row, from top to bottom
-	// Each character holds 2 data points (left and right columns)
-	var rows []string
+	// Use rightmost data points if we have more data than chart columns
+	dataOffset := max(0, len(heights)-chartWidth*2)
+
+	labelStyle := lipgloss.NewStyle().Width(labelWidth).Align(lipgloss.Right)
 	for row := range c.Height {
 		var sb strings.Builder
 		rowBottomDot := (c.Height - 1 - row) * 4
 		rowTopDot := rowBottomDot + 4
 
-		for col := range c.Width {
-			dataIdxLeft := col * 2
-			dataIdxRight := col*2 + 1
+		for col := range chartWidth {
+			dataIdxLeft := dataOffset + col*2
+			dataIdxRight := dataOffset + col*2 + 1
 
 			var char rune = 0x2800 // braille base character
 
@@ -82,10 +105,23 @@ func (c Chart) View() string {
 
 			sb.WriteRune(char)
 		}
-		rows = append(rows, c.Color.Render(sb.String()))
+
+		// Add label on first and last row
+		var label string
+		switch row {
+		case 0:
+			label = labelStyle.Render(maxLabel)
+		case c.Height - 1:
+			label = labelStyle.Render("0")
+		default:
+			label = labelStyle.Render("")
+		}
+
+		chartRow := c.Color.Render(sb.String())
+		output = append(output, label+" "+chartRow)
 	}
 
-	return strings.Join(rows, "\n")
+	return strings.Join(output, "\n")
 }
 
 // brailleColumn returns the braille bits for a single column based on height
@@ -113,4 +149,16 @@ func (c Chart) maxValue() float64 {
 		}
 	}
 	return max
+}
+
+// Helpers
+
+func formatChartValue(v float64) string {
+	if v >= 1_000_000 {
+		return fmt.Sprintf("%.1fM", v/1_000_000)
+	}
+	if v >= 1_000 {
+		return fmt.Sprintf("%.1fK", v/1_000)
+	}
+	return fmt.Sprintf("%.0f", v)
 }
