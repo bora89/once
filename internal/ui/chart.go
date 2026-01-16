@@ -41,6 +41,9 @@ func (c Chart) View() string {
 		return ""
 	}
 
+	// Account for border (2 chars width, 2 lines height)
+	innerWidth := c.Width - 2
+
 	maxVal := c.maxValue()
 	displayMax := maxVal
 	if maxVal == 0 {
@@ -50,7 +53,7 @@ func (c Chart) View() string {
 	// Format labels and calculate label width
 	maxLabel := formatChartValue(displayMax)
 	labelWidth := max(len(maxLabel), 1)
-	chartWidth := c.Width - labelWidth - 1 // -1 for space between label and chart
+	chartWidth := innerWidth - labelWidth - 1 // -1 for space between label and chart
 
 	if chartWidth <= 0 {
 		return ""
@@ -60,28 +63,27 @@ func (c Chart) View() string {
 	dotsHeight := c.Height * 4
 
 	// Calculate the height in dots for each data point
-	// Always show at least 1 dot so zeros are visible
 	heights := make([]int, len(c.Data))
 	for i, v := range c.Data {
 		heights[i] = int((v / maxVal) * float64(dotsHeight))
-		if heights[i] == 0 {
-			heights[i] = 1 // show at least 1 dot for all values including zero
+		if v > 0 && heights[i] == 0 {
+			heights[i] = 1 // ensure non-zero values show at least 1 dot
 		}
 	}
 
-	var output []string
+	var content []string
 
-	// Title line (centered over full width)
+	// Title line (centered over inner width)
 	if c.Title != "" {
-		titleLine := lipgloss.NewStyle().Width(c.Width).Align(lipgloss.Center).Render(c.Title)
-		output = append(output, titleLine)
+		titleLine := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(c.Title)
+		content = append(content, titleLine)
 	}
 
 	// Build the chart row by row, from top to bottom
 	// Use rightmost data points if we have more data than chart columns
 	dataOffset := max(0, len(heights)-chartWidth*2)
 
-	labelStyle := lipgloss.NewStyle().Width(labelWidth).Align(lipgloss.Right)
+	labelStyle := lipgloss.NewStyle().Width(labelWidth).Align(lipgloss.Left)
 	for row := range c.Height {
 		var sb strings.Builder
 		rowBottomDot := (c.Height - 1 - row) * 4
@@ -118,10 +120,15 @@ func (c Chart) View() string {
 		}
 
 		chartRow := c.Color.Render(sb.String())
-		output = append(output, label+" "+chartRow)
+		content = append(content, label+" "+chartRow)
 	}
 
-	return strings.Join(output, "\n")
+	// Wrap in rounded border
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#6272a4"))
+
+	return borderStyle.Render(strings.Join(content, "\n"))
 }
 
 // brailleColumn returns the braille bits for a single column based on height
