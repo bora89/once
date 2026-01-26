@@ -33,14 +33,15 @@ type Component interface {
 type NamespaceChangedMsg struct{}
 
 type App struct {
-	namespace     *docker.Namespace
-	scraper       *metrics.MetricsScraper
-	currentIndex  int
-	currentScreen Component
-	lastSize      tea.WindowSizeMsg
-	eventChan     <-chan struct{}
-	watchCtx      context.Context
-	watchCancel   context.CancelFunc
+	namespace      *docker.Namespace
+	scraper        *metrics.MetricsScraper
+	dockerScraper  *docker.Scraper
+	currentIndex   int
+	currentScreen  Component
+	lastSize       tea.WindowSizeMsg
+	eventChan      <-chan struct{}
+	watchCtx       context.Context
+	watchCancel    context.CancelFunc
 }
 
 func NewApp(ns *docker.Namespace) App {
@@ -59,21 +60,25 @@ func NewApp(ns *docker.Namespace) App {
 	})
 	scraper.Start(ctx)
 
+	dockerScraper := docker.NewScraper(ns, docker.ScraperSettings{})
+	dockerScraper.Start(ctx)
+
 	var screen Component
 	if len(apps) > 0 {
-		screen = NewDashboard(apps[0], scraper)
+		screen = NewDashboard(apps[0], scraper, dockerScraper)
 	} else {
 		screen = NewEmptyState()
 	}
 
 	return App{
-		namespace:     ns,
-		scraper:       scraper,
-		currentIndex:  0,
-		currentScreen: screen,
-		eventChan:     eventChan,
-		watchCtx:      ctx,
-		watchCancel:   cancel,
+		namespace:      ns,
+		scraper:        scraper,
+		dockerScraper:  dockerScraper,
+		currentIndex:   0,
+		currentScreen:  screen,
+		eventChan:      eventChan,
+		watchCtx:       ctx,
+		watchCancel:    cancel,
 	}
 }
 
@@ -99,7 +104,7 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_ = m.namespace.Refresh(m.watchCtx)
 		apps := m.namespace.Applications()
 		if len(apps) > 0 && m.currentIndex < len(apps) {
-			m.currentScreen = NewDashboard(apps[m.currentIndex], m.scraper)
+			m.currentScreen = NewDashboard(apps[m.currentIndex], m.scraper, m.dockerScraper)
 			m.currentScreen, _ = m.currentScreen.Update(m.lastSize)
 		}
 		return m, tea.Batch(m.currentScreen.Init(), m.watchForChanges())
@@ -127,6 +132,7 @@ func Run(ns *docker.Namespace) error {
 func (m App) shutdown() {
 	m.watchCancel()
 	m.scraper.Stop()
+	m.dockerScraper.Stop()
 }
 
 func (m App) switchApp(delta int) (tea.Model, tea.Cmd) {
@@ -147,7 +153,7 @@ func (m App) switchApp(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	m.currentIndex = newIndex
-	m.currentScreen = NewDashboard(apps[newIndex], m.scraper)
+	m.currentScreen = NewDashboard(apps[newIndex], m.scraper, m.dockerScraper)
 	m.currentScreen, _ = m.currentScreen.Update(m.lastSize)
 	return m, m.currentScreen.Init()
 }

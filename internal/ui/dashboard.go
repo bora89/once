@@ -42,6 +42,7 @@ var dashboardKeys = dashboardKeyMap{
 type Dashboard struct {
 	app           *docker.Application
 	scraper       *metrics.MetricsScraper
+	dockerScraper *docker.Scraper
 	width, height int
 	upgrading     bool
 	progress      ProgressBusy
@@ -124,18 +125,19 @@ type upgradeFinishedMsg struct {
 	err error
 }
 
-func NewDashboard(app *docker.Application, scraper *metrics.MetricsScraper) Dashboard {
+func NewDashboard(app *docker.Application, scraper *metrics.MetricsScraper, dockerScraper *docker.Scraper) Dashboard {
 	service := app.Settings.Name
 	allReqChart := NewRequestRateChart(scraper, service, "Requests/min", false)
 	errorChart := NewRequestRateChart(scraper, service, "Errors/min", true)
 	allReqChart.Update()
 	errorChart.Update()
 	return Dashboard{
-		app:         app,
-		scraper:     scraper,
-		help:        help.New(),
-		allReqChart: allReqChart,
-		errorChart:  errorChart,
+		app:           app,
+		scraper:       scraper,
+		dockerScraper: dockerScraper,
+		help:          help.New(),
+		allReqChart:   allReqChart,
+		errorChart:    errorChart,
 	}
 }
 
@@ -216,6 +218,11 @@ func (m Dashboard) View() string {
 		infoLines = append(infoLines, fmt.Sprintf("URL: %s", url))
 	}
 
+	if samples := m.dockerScraper.Fetch(m.app.Settings.Name, 1); len(samples) > 0 {
+		sample := samples[0]
+		infoLines = append(infoLines, fmt.Sprintf("CPU: %.1f%%  Memory: %s", sample.CPUPercent, formatBytes(sample.MemoryBytes)))
+	}
+
 	infoContent := strings.Join(infoLines, "\n")
 	infoBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -283,4 +290,22 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dd", days)
 	}
 	return fmt.Sprintf("%dd %dh", days, hours)
+}
+
+func formatBytes(b uint64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+	switch {
+	case b >= GB:
+		return fmt.Sprintf("%.1f GB", float64(b)/GB)
+	case b >= MB:
+		return fmt.Sprintf("%.1f MB", float64(b)/MB)
+	case b >= KB:
+		return fmt.Sprintf("%.1f KB", float64(b)/KB)
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
 }

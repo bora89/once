@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"sync"
 	"time"
 
@@ -88,18 +87,6 @@ func (s *MetricsScraper) Stop() {
 	}
 }
 
-func (s *MetricsScraper) Services() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	services := make([]string, 0, len(s.services))
-	for name := range s.services {
-		services = append(services, name)
-	}
-	slices.Sort(services)
-	return services
-}
-
 // Fetch returns the last n samples for a service, ordered from newest to oldest.
 // If fewer than n samples exist, only the available samples are returned.
 func (s *MetricsScraper) Fetch(service string, n int) []Sample {
@@ -163,19 +150,6 @@ func (s *MetricsScraper) FetchAverage(service string, points, window int) []Samp
 	}
 
 	return result
-}
-
-func (s *MetricsScraper) Latest(service string) (Sample, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	data, ok := s.services[service]
-	if !ok || data.count == 0 {
-		return Sample{}, false
-	}
-
-	idx := (data.head - 1 + len(data.samples)) % len(data.samples)
-	return data.samples[idx], true
 }
 
 func (s *MetricsScraper) LastError() error {

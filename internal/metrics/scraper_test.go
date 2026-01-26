@@ -147,34 +147,6 @@ func TestMetricsScraperFetchAverageAllFields(t *testing.T) {
 	assert.Equal(t, int64(4+0), samples[0].ServerErrors)    // 4 delta + 0 delta
 }
 
-func TestMetricsScraperLatest(t *testing.T) {
-	scraper := NewMetricsScraper(ScraperSettings{BufferSize: 10})
-
-	_, ok := scraper.Latest("myapp")
-	assert.False(t, ok)
-
-	scraper.recordSamples(map[string]*counterState{"myapp": {success: 10}})
-	scraper.recordSamples(map[string]*counterState{"myapp": {success: 30}})
-
-	sample, ok := scraper.Latest("myapp")
-	assert.True(t, ok)
-	assert.Equal(t, int64(20), sample.Success)
-}
-
-func TestMetricsScraperServices(t *testing.T) {
-	scraper := NewMetricsScraper(ScraperSettings{BufferSize: 10})
-
-	assert.Empty(t, scraper.Services())
-
-	scraper.recordSamples(map[string]*counterState{
-		"app-b": {success: 10},
-		"app-a": {success: 20},
-	})
-
-	services := scraper.Services()
-	assert.Equal(t, []string{"app-a", "app-b"}, services)
-}
-
 func TestMetricsScraperMultipleServices(t *testing.T) {
 	scraper := NewMetricsScraper(ScraperSettings{BufferSize: 10})
 
