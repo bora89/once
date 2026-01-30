@@ -29,17 +29,29 @@ func (s ScraperSettings) withDefaults() ScraperSettings {
 	return s
 }
 
+// statsClient defines the Docker API operations needed by the scraper
+type statsClient interface {
+	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
+	ContainerStats(ctx context.Context, containerID string, stream bool) (container.StatsResponseReader, error)
+}
+
 // Scraper collects Docker container stats using persistent streaming connections.
 // Background goroutines maintain streams for each container and update latest stats.
 // Scrape() snapshots the current values without blocking on Docker API calls.
 type Scraper struct {
-	settings  ScraperSettings
-	namespace *Namespace
+	settings ScraperSettings
+	client   statsClient
+	prefix   string
 
 	mu        sync.RWMutex
 	apps      map[string]*appData
-	streams   map[string]context.CancelFunc
+	streams   map[string]*streamInfo
 	lastError error
+}
+
+type streamInfo struct {
+	containerID string
+	cancel      context.CancelFunc
 }
 
 type appData struct {
@@ -57,10 +69,11 @@ type liveStats struct {
 func NewScraper(ns *Namespace, settings ScraperSettings) *Scraper {
 	settings = settings.withDefaults()
 	return &Scraper{
-		settings:  settings,
-		namespace: ns,
-		apps:      make(map[string]*appData),
-		streams:   make(map[string]context.CancelFunc),
+		settings: settings,
+		client:   ns.client,
+		prefix:   ns.name + "-app-",
+		apps:     make(map[string]*appData),
+		streams:  make(map[string]*streamInfo),
 	}
 }
 
@@ -128,22 +141,20 @@ func (s *Scraper) Scrape(ctx context.Context) {
 }
 
 func (s *Scraper) findAppContainers(ctx context.Context) (map[string]string, error) {
-	containers, err := s.namespace.client.ContainerList(ctx, container.ListOptions{})
+	containers, err := s.client.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	prefix := s.namespace.name + "-app-"
 	result := make(map[string]string)
-
 	for _, c := range containers {
 		if c.State != "running" {
 			continue
 		}
 		for _, name := range c.Names {
 			name = strings.TrimPrefix(name, "/")
-			if strings.HasPrefix(name, prefix) {
-				remainder := strings.TrimPrefix(name, prefix)
+			if strings.HasPrefix(name, s.prefix) {
+				remainder := strings.TrimPrefix(name, s.prefix)
 				lastDash := strings.LastIndex(remainder, "-")
 				if lastDash > 0 {
 					appName := remainder[:lastDash]
@@ -162,10 +173,14 @@ func (s *Scraper) updateStreams(ctx context.Context, containers map[string]strin
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Start streams for new containers
+	// Start or restart streams for containers
 	for appName, containerID := range containers {
-		if _, exists := s.streams[appName]; exists {
-			continue
+		if stream, exists := s.streams[appName]; exists {
+			if stream.containerID == containerID {
+				continue
+			}
+			// Container ID changed (redeployed), restart stream
+			stream.cancel()
 		}
 
 		if s.apps[appName] == nil {
@@ -175,14 +190,14 @@ func (s *Scraper) updateStreams(ctx context.Context, containers map[string]strin
 		}
 
 		streamCtx, cancel := context.WithCancel(ctx)
-		s.streams[appName] = cancel
+		s.streams[appName] = &streamInfo{containerID: containerID, cancel: cancel}
 		go s.runStream(streamCtx, appName, containerID)
 	}
 
 	// Stop streams for removed containers
-	for appName, cancel := range s.streams {
+	for appName, stream := range s.streams {
 		if _, exists := containers[appName]; !exists {
-			cancel()
+			stream.cancel()
 			delete(s.streams, appName)
 		}
 	}
@@ -202,7 +217,7 @@ func (s *Scraper) runStream(ctx context.Context, appName, containerID string) {
 }
 
 func (s *Scraper) streamStats(ctx context.Context, appName, containerID string) {
-	resp, err := s.namespace.client.ContainerStats(ctx, containerID, true)
+	resp, err := s.client.ContainerStats(ctx, containerID, true)
 	if err != nil {
 		return
 	}
