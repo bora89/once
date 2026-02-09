@@ -5,11 +5,12 @@ go 1.25.5
 require (
 	charm.land/bubbles/v2 v2.0.0-rc.1
 	charm.land/bubbletea/v2 v2.0.0-rc.2
-	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251106192539-4b304240aab7
+	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251114164805-d267651963ad
 	github.com/containerd/errdefs v1.0.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
+	github.com/lrstanley/bubblezone/v2 v2.0.0-alpha.3
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.67.5
 	github.com/spf13/cobra v1.10.2

@@ -2,10 +2,18 @@ package ui
 
 import (
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	zone.NewGlobal()
+	m.Run()
+}
 
 func TestForm_FocusCycling(t *testing.T) {
 	form := NewForm("Submit",
@@ -153,6 +161,54 @@ func TestForm_FieldValuesAccessible(t *testing.T) {
 
 	formTypeText(&form, "hello")
 	assert.Equal(t, "hello", form.TextField(0).Value())
+}
+
+func TestForm_ClickFieldFocuses(t *testing.T) {
+	form := NewForm("Submit",
+		FormItem{Label: "First", Field: NewTextField("first")},
+		FormItem{Label: "Second", Field: NewTextField("second")},
+	)
+	assert.Equal(t, 0, form.Focused())
+
+	zone.Scan(form.View())
+	time.Sleep(15 * time.Millisecond)
+
+	zi := zone.Get(form.fieldZoneID(1))
+	require.False(t, zi.IsZero())
+
+	form, action, _ := form.Update(tea.MouseClickMsg{X: zi.StartX, Y: zi.StartY, Button: tea.MouseLeft})
+	assert.Equal(t, FormNoAction, action)
+	assert.Equal(t, 1, form.Focused())
+}
+
+func TestForm_ClickSubmit(t *testing.T) {
+	form := NewForm("Done",
+		FormItem{Label: "Field", Field: NewTextField("val")},
+	)
+
+	zone.Scan(form.View())
+	time.Sleep(15 * time.Millisecond)
+
+	zi := zone.Get(form.submitZoneID())
+	require.False(t, zi.IsZero())
+
+	_, action, _ := form.Update(tea.MouseClickMsg{X: zi.StartX, Y: zi.StartY, Button: tea.MouseLeft})
+	assert.Equal(t, FormSubmitted, action)
+}
+
+func TestForm_ClickCancel(t *testing.T) {
+	form := NewForm("Done",
+		FormItem{Label: "Field", Field: NewTextField("val")},
+	)
+
+	zone.Scan(form.View())
+	time.Sleep(15 * time.Millisecond)
+
+	zi := zone.Get(form.cancelZoneID())
+	require.False(t, zi.IsZero())
+
+	_, action, _ := form.Update(tea.MouseClickMsg{X: zi.StartX, Y: zi.StartY, Button: tea.MouseLeft})
+	assert.Equal(t, FormCancelled, action)
 }
 
 // Helpers

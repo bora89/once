@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 
 	"github.com/basecamp/once/internal/docker"
 	"github.com/basecamp/once/internal/metrics"
@@ -181,12 +182,16 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m App) View() tea.View {
-	view := tea.View{AltScreen: true}
-	view.SetContent(m.currentScreen.View())
+	view := tea.View{
+		AltScreen: true,
+		MouseMode: tea.MouseModeCellMotion,
+	}
+	view.SetContent(zone.Scan(m.currentScreen.View()))
 	return view
 }
 
 func Run(ns *docker.Namespace) error {
+	zone.NewGlobal()
 	app := NewApp(ns)
 	_, err := tea.NewProgram(app).Run()
 	return err

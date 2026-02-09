@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 
 	"github.com/basecamp/once/internal/docker"
 )
@@ -75,13 +76,17 @@ func (m InstallActivity) Update(msg tea.Msg) (InstallActivity, tea.Cmd) {
 		m.progressBar.Total = 100
 		m.progressBusy = NewProgressBusy(progressWidth, Colors.Primary)
 
+	case tea.MouseClickMsg:
+		if msg.Button == tea.MouseLeft {
+			if zi := zone.Get(m.buttonZoneID()); zi != nil && zi.InBounds(msg) {
+				return m, m.activateButtonForCurrentStage()
+			}
+		}
+
 	case tea.KeyMsg:
 		if m.stage == stageFinished || m.stage == stageFailed {
 			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-				if m.stage == stageFinished {
-					return m, func() tea.Msg { return InstallActivityDoneMsg{App: m.app} }
-				}
-				return m, func() tea.Msg { return navigateToDashboardMsg{} }
+				return m, m.activateButtonForCurrentStage()
 			}
 		}
 
@@ -159,13 +164,22 @@ func (m InstallActivity) View() string {
 			Width(m.width).
 			Align(lipgloss.Center).
 			MarginTop(1).
-			Render(buttonStyle.Render(label))
+			Render(zone.Mark(m.buttonZoneID(), buttonStyle.Render(label)))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, statusLine, progressView, buttonView)
 }
 
 // Private
+
+func (m InstallActivity) activateButtonForCurrentStage() tea.Cmd {
+	if m.stage == stageFinished {
+		return func() tea.Msg { return InstallActivityDoneMsg{App: m.app} }
+	}
+	return func() tea.Msg { return navigateToDashboardMsg{} }
+}
+
+func (m InstallActivity) buttonZoneID() string { return "install_button" }
 
 func (m InstallActivity) startInstall() tea.Cmd {
 	return func() tea.Msg {

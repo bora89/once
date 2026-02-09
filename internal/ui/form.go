@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"fmt"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 )
 
 type FormField interface {
@@ -155,12 +158,14 @@ type Form struct {
 	submitLabel string
 	focused     int
 	width       int
+	prefix      string
 }
 
 func NewForm(submitLabel string, items ...FormItem) Form {
 	f := Form{
 		items:       items,
 		submitLabel: submitLabel,
+		prefix:      zone.NewPrefix(),
 	}
 
 	if len(items) > 0 {
@@ -181,6 +186,11 @@ func (f Form) Update(msg tea.Msg) (Form, FormAction, tea.Cmd) {
 		inputWidth := min(f.width-4, 60)
 		for _, item := range f.items {
 			item.Field.SetWidth(inputWidth)
+		}
+
+	case tea.MouseClickMsg:
+		if msg.Button == tea.MouseLeft {
+			return f.handleMouseClick(msg)
 		}
 
 	case tea.KeyMsg:
@@ -211,13 +221,15 @@ func (f Form) View() string {
 		label := Styles.Label.Render(item.Label)
 		field := Styles.Focus(Styles.Input, f.focused == i).
 			Render(item.Field.View())
-		parts = append(parts, label, field)
+		parts = append(parts, label, zone.Mark(f.fieldZoneID(i), field))
 	}
 
-	submitButton := Styles.Focus(Styles.ButtonPrimary, f.focused == f.submitIndex()).
-		Render(f.submitLabel)
-	cancelButton := Styles.Focus(Styles.Button, f.focused == f.cancelIndex()).
-		Render("Cancel")
+	submitButton := zone.Mark(f.submitZoneID(),
+		Styles.Focus(Styles.ButtonPrimary, f.focused == f.submitIndex()).
+			Render(f.submitLabel))
+	cancelButton := zone.Mark(f.cancelZoneID(),
+		Styles.Focus(Styles.Button, f.focused == f.cancelIndex()).
+			Render("Cancel"))
 
 	buttons := lipgloss.JoinHorizontal(lipgloss.Center, submitButton, cancelButton)
 	parts = append(parts, "", buttons)
@@ -281,6 +293,42 @@ func (f Form) handleEnter() (Form, FormAction, tea.Cmd) {
 	}
 	return f, FormNoAction, nil
 }
+
+func (f Form) handleMouseClick(msg tea.MouseClickMsg) (Form, FormAction, tea.Cmd) {
+	for i := range f.items {
+		if zi := zone.Get(f.fieldZoneID(i)); zi != nil && zi.InBounds(msg) {
+			form, cmd := f.focusIndex(i)
+			return form, FormNoAction, cmd
+		}
+	}
+
+	if zi := zone.Get(f.submitZoneID()); zi != nil && zi.InBounds(msg) {
+		return f, FormSubmitted, nil
+	}
+
+	if zi := zone.Get(f.cancelZoneID()); zi != nil && zi.InBounds(msg) {
+		return f, FormCancelled, nil
+	}
+
+	return f, FormNoAction, nil
+}
+
+func (f Form) focusIndex(i int) (Form, tea.Cmd) {
+	f.blurCurrent()
+	f.focused = i
+	return f.focusCurrent()
+}
+
+func (f Form) zoneID(name string) string {
+	return fmt.Sprintf("%s%s", f.prefix, name)
+}
+
+func (f Form) fieldZoneID(i int) string {
+	return f.zoneID(fmt.Sprintf("field_%d", i))
+}
+
+func (f Form) submitZoneID() string { return f.zoneID("submit") }
+func (f Form) cancelZoneID() string { return f.zoneID("cancel") }
 
 func (f Form) submitIndex() int { return len(f.items) }
 func (f Form) cancelIndex() int { return len(f.items) + 1 }
