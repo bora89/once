@@ -18,8 +18,12 @@ type RootCommand struct {
 func NewRootCommand() *RootCommand {
 	r := &RootCommand{}
 	r.cmd = &cobra.Command{
-		Use:   "once",
-		Short: "Manage web applications from Docker images",
+		Use:          "once",
+		Short:        "Manage web applications from Docker images",
+		SilenceUsage: true,
+		CompletionOptions: cobra.CompletionOptions{
+			HiddenDefaultCmd: true,
+		},
 		RunE: WithNamespace(func(ns *docker.Namespace, cmd *cobra.Command, args []string) error {
 			return ui.Run(ns)
 		}),
