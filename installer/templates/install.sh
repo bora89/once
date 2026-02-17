@@ -57,9 +57,9 @@ ensure_docker() {
 
     echo "Installing Docker..."
     if is_root; then
-        sh -c "$(curl -fsSL https://get.docker.com)"
+        sh -c "$(curl -fsSL https://get.docker.com)" > /dev/null 2>&1
     else
-        curl -fsSL https://get.docker.com | sudo sh
+        curl -fsSL https://get.docker.com | sudo sh > /dev/null 2>&1
     fi
 
     if ! is_root; then
