@@ -414,7 +414,7 @@ func renderChange(change *LineChange, currentStyle Style, width int) (string, St
 	}
 
 	if change.ClearEOL {
-		if len(change.Spans) == 0 {
+		if len(change.Spans) == 0 || change.ClearCol > 0 {
 			writeCursorPosition(&out, change.Row+1, change.ClearCol+1)
 		}
 		if !style.IsDefault() {

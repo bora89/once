@@ -523,6 +523,43 @@ func TestDiff_LogsScenario_SmallTerminal(t *testing.T) {
 	}
 }
 
+func TestRenderChange_ClearEOL_RepositionsCursorWhenSpansRemain(t *testing.T) {
+	// Scenario: a line has two change regions:
+	//   - Span at col 3 (e.g. a starfield star changed)
+	//   - Span at cols 70-79 that are all default spaces (starfield edge cleared)
+	// The ClearEOL optimization removes the trailing span and sets clearCol=70.
+	// The cursor must be repositioned to col 70 before issuing EraseLineRight,
+	// NOT left at col 4 (end of the first span).
+	width := 80
+
+	old := make([]Cell, width)
+	new := make([]Cell, width)
+	for i := range width {
+		old[i] = Cell{Rune: '.', Width: 1, Style: DefaultStyle()}
+		new[i] = Cell{Rune: '.', Width: 1, Style: DefaultStyle()}
+	}
+
+	// Change at col 3
+	new[3] = Cell{Rune: 'X', Width: 1, Style: DefaultStyle()}
+
+	// Trailing region (cols 70-79) changes to default spaces
+	for i := 70; i < 80; i++ {
+		old[i] = Cell{Rune: '*', Width: 1, Style: DefaultStyle()}
+		new[i] = Cell{Rune: ' ', Width: 1, Style: DefaultStyle()}
+	}
+
+	change := diffLine(5, old, new)
+	require.NotNil(t, change)
+	assert.True(t, change.ClearEOL)
+	assert.Equal(t, 70, change.ClearCol)
+
+	output, _ := renderChange(change, DefaultStyle(), width)
+
+	// Must contain cursor position at row 6, col 71 (1-indexed) for ClearEOL
+	assert.Contains(t, output, "\x1b[6;71H", "cursor must be repositioned to clearCol before EraseLineRight")
+	assert.Contains(t, output, EraseLineRight)
+}
+
 func extractLineText(cells []Cell) []rune {
 	var result []rune
 	for _, c := range cells {
