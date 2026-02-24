@@ -29,6 +29,7 @@ import (
 
 var (
 	ErrApplicationExists  = errors.New("application already exists")
+	ErrHostRequired       = errors.New("host is required")
 	ErrInvalidBackup      = errors.New("invalid backup archive")
 	ErrBackupPathRelative = errors.New("backup path must be absolute")
 	ErrSetupFailed        = errors.New("setup failed")
@@ -252,6 +253,10 @@ func (a *Application) Update(ctx context.Context, progress DeployProgressCallbac
 }
 
 func (a *Application) Deploy(ctx context.Context, progress DeployProgressCallback) error {
+	if a.Settings.Host == "" {
+		return ErrHostRequired
+	}
+
 	if _, err := a.pullImage(ctx, progress); err != nil {
 		return err
 	}

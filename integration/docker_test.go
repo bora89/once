@@ -35,6 +35,7 @@ func TestDockerDeployment(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "campfire",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "campfire.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 }
@@ -55,6 +56,7 @@ func TestRestoreState(t *testing.T) {
 	app := ns1.AddApplication(docker.ApplicationSettings{
 		Name:  "testapp",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "testapp.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -125,6 +127,7 @@ func TestGaplessDeployment(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "gapless",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "gapless.localhost",
 	})
 
 	require.NoError(t, app.Deploy(ctx, nil), "first deploy")
@@ -172,6 +175,7 @@ func TestLargeLabelData(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "largelabel",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "largelabel.localhost",
 		EnvVars: map[string]string{
 			"LARGE_VALUE": largeValue,
 		},
@@ -200,6 +204,7 @@ func TestStartStop(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "startstop",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "startstop.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -233,6 +238,7 @@ func TestLongAppName(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  longName,
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "longname.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -258,6 +264,7 @@ func TestContainerLogConfig(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "logtest",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "logtest.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -283,6 +290,7 @@ func TestBackup(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "backupapp",
 		Image: imageName,
+		Host:  "backupapp.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -414,6 +422,7 @@ func TestRestoreExistingAppFails(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "existingapp",
 		Image: imageName,
+		Host:  "existingapp.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -443,6 +452,7 @@ func TestRemoveApplication(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "removeapp",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "removeapp.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -471,6 +481,7 @@ func TestRemoveApplicationWithData(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:  "removeapp",
 		Image: "ghcr.io/basecamp/once-campfire:main",
+		Host:  "removeapp.localhost",
 	})
 	require.NoError(t, app.Deploy(ctx, nil))
 
@@ -501,6 +512,7 @@ func TestContainerResources(t *testing.T) {
 	app := ns.AddApplication(docker.ApplicationSettings{
 		Name:      "campfire",
 		Image:     "ghcr.io/basecamp/once-campfire:main",
+		Host:      "campfire.localhost",
 		Resources: docker.ContainerResources{CPUs: 1, MemoryMB: 1024},
 	})
 	require.NoError(t, app.Deploy(ctx, nil))

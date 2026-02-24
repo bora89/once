@@ -80,14 +80,15 @@ func (n *Namespace) Applications() []*Application {
 	return n.applications
 }
 
-func (n *Namespace) UniqueName(base string) string {
-	if n.Application(base) == nil {
-		return base
-	}
-	for i := 1; ; i++ {
-		candidate := fmt.Sprintf("%s.%d", base, i)
+func (n *Namespace) UniqueName(base string) (string, error) {
+	for {
+		id, err := randomID(6)
+		if err != nil {
+			return "", err
+		}
+		candidate := fmt.Sprintf("%s.%s", base, id)
 		if n.Application(candidate) == nil {
-			return candidate
+			return candidate, nil
 		}
 	}
 }
