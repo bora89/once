@@ -3,12 +3,11 @@ package command
 import "github.com/spf13/cobra"
 
 type BackgroundCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewBackgroundCommand(root *RootCommand) *BackgroundCommand {
-	b := &BackgroundCommand{root: root}
+	b := &BackgroundCommand{}
 	b.cmd = &cobra.Command{
 		Use:   "background",
 		Short: "Manage background tasks (automatic backups and updates)",

@@ -11,12 +11,11 @@ import (
 )
 
 type BackupCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewBackupCommand(root *RootCommand) *BackupCommand {
-	b := &BackupCommand{root: root}
+	b := &BackupCommand{}
 	b.cmd = &cobra.Command{
 		Use:   "backup <app> <filename>",
 		Short: "Backup an application to a file",

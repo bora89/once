@@ -11,12 +11,11 @@ import (
 )
 
 type BackgroundUninstallCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewBackgroundUninstallCommand(root *RootCommand) *BackgroundUninstallCommand {
-	b := &BackgroundUninstallCommand{root: root}
+	b := &BackgroundUninstallCommand{}
 	b.cmd = &cobra.Command{
 		Use:   "uninstall",
 		Short: "Uninstall the background tasks system service",

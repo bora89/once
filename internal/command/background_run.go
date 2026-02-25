@@ -11,12 +11,11 @@ import (
 )
 
 type BackgroundRunCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewBackgroundRunCommand(root *RootCommand) *BackgroundRunCommand {
-	b := &BackgroundRunCommand{root: root}
+	b := &BackgroundRunCommand{}
 	b.cmd = &cobra.Command{
 		Use:    "run",
 		Short:  "Run background tasks (automatic backups and updates)",

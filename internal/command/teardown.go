@@ -10,13 +10,12 @@ import (
 )
 
 type TeardownCommand struct {
-	root       *RootCommand
 	cmd        *cobra.Command
 	removeData bool
 }
 
 func NewTeardownCommand(root *RootCommand) *TeardownCommand {
-	t := &TeardownCommand{root: root}
+	t := &TeardownCommand{}
 	t.cmd = &cobra.Command{
 		Use:   "teardown",
 		Short: "Remove all applications and the proxy",

@@ -11,12 +11,11 @@ import (
 )
 
 type RestoreCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewRestoreCommand(root *RootCommand) *RestoreCommand {
-	r := &RestoreCommand{root: root}
+	r := &RestoreCommand{}
 	r.cmd = &cobra.Command{
 		Use:   "restore <filename>",
 		Short: "Restore an application from a backup file",

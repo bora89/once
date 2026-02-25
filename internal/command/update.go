@@ -7,12 +7,11 @@ import (
 )
 
 type UpdateCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewUpdateCommand(root *RootCommand) *UpdateCommand {
-	u := &UpdateCommand{root: root}
+	u := &UpdateCommand{}
 	u.cmd = &cobra.Command{
 		Use:   "update",
 		Short: "Update once to the latest version",

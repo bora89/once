@@ -137,9 +137,11 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case namespaceChangedMsg:
-		_ = m.namespace.Refresh(m.watchCtx)
-		m.currentScreen.Update(msg)
-		return m, m.watchForChanges()
+		if err := m.namespace.Refresh(m.watchCtx); err != nil {
+			slog.Error("refreshing namespace", "err", err)
+		}
+		cmd := m.currentScreen.Update(msg)
+		return m, tea.Batch(cmd, m.watchForChanges())
 
 	case scrapeTickMsg:
 		return m, tea.Batch(
@@ -148,15 +150,18 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case scrapeDoneMsg:
-		m.currentScreen.Update(msg)
+		cmd := m.currentScreen.Update(msg)
+		return m, cmd
 
 	case navigateToInstallMsg:
 		m.currentScreen = NewInstall(m.namespace, "")
-		m.currentScreen.Update(m.lastSize)
-		return m, m.currentScreen.Init()
+		sizeCmd := m.currentScreen.Update(m.lastSize)
+		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 
 	case navigateToAppMsg:
-		_ = m.namespace.Refresh(m.watchCtx)
+		if err := m.namespace.Refresh(m.watchCtx); err != nil {
+			slog.Error("refreshing namespace", "err", err)
+		}
 		apps := m.namespace.Applications()
 		targetIndex := 0
 		for i, app := range apps {
@@ -166,11 +171,13 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.currentScreen = NewDashboard(m.namespace, apps, targetIndex, m.scraper, m.dockerScraper)
-		m.currentScreen.Update(m.lastSize)
-		return m, m.currentScreen.Init()
+		sizeCmd := m.currentScreen.Update(m.lastSize)
+		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 
 	case navigateToDashboardMsg:
-		_ = m.namespace.Refresh(m.watchCtx)
+		if err := m.namespace.Refresh(m.watchCtx); err != nil {
+			slog.Error("refreshing namespace", "err", err)
+		}
 		apps := m.namespace.Applications()
 		if len(apps) > 0 {
 			selectedIndex := 0
@@ -181,21 +188,21 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.currentScreen = NewDashboard(m.namespace, apps, selectedIndex, m.scraper, m.dockerScraper)
-			m.currentScreen.Update(m.lastSize)
-			return m, m.currentScreen.Init()
+			sizeCmd := m.currentScreen.Update(m.lastSize)
+			return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 		}
 		m.shutdown()
 		return m, tea.Quit
 
 	case navigateToSettingsSectionMsg:
 		m.currentScreen = NewSettings(m.namespace, msg.app, msg.section)
-		m.currentScreen.Update(m.lastSize)
-		return m, m.currentScreen.Init()
+		sizeCmd := m.currentScreen.Update(m.lastSize)
+		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 
 	case navigateToLogsMsg:
 		m.currentScreen = NewLogs(m.namespace, msg.app)
-		m.currentScreen.Update(m.lastSize)
-		return m, m.currentScreen.Init()
+		sizeCmd := m.currentScreen.Update(m.lastSize)
+		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 
 	case quitMsg:
 		m.shutdown()

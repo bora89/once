@@ -90,7 +90,7 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 		m.rebuildViewportContent()
 
 		if m.showingMenu {
-			m.settingsMenu.Update(msg)
+			cmds = append(cmds, m.settingsMenu.Update(msg))
 		}
 
 	case MouseEvent:
@@ -139,8 +139,8 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 			app := m.apps[m.selectedIndex]
 			m.showingMenu = true
 			m.settingsMenu = NewSettingsMenu(app)
-			m.settingsMenu.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-			return nil
+			cmd := m.settingsMenu.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			return cmd
 		}
 		if key.Matches(msg, dashboardKeys.StartStop) && len(m.apps) > 0 && !m.toggling {
 			app := m.apps[m.selectedIndex]

@@ -10,12 +10,11 @@ import (
 )
 
 type StopCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewStopCommand(root *RootCommand) *StopCommand {
-	s := &StopCommand{root: root}
+	s := &StopCommand{}
 	s.cmd = &cobra.Command{
 		Use:   "stop <app>",
 		Short: "Stop an application",

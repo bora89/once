@@ -12,12 +12,11 @@ import (
 )
 
 type BackgroundInstallCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewBackgroundInstallCommand(root *RootCommand) *BackgroundInstallCommand {
-	b := &BackgroundInstallCommand{root: root}
+	b := &BackgroundInstallCommand{}
 	b.cmd = &cobra.Command{
 		Use:   "install",
 		Short: "Install background tasks as a system service",

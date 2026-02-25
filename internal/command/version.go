@@ -9,12 +9,11 @@ import (
 )
 
 type VersionCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewVersionCommand(root *RootCommand) *VersionCommand {
-	v := &VersionCommand{root: root}
+	v := &VersionCommand{}
 	v.cmd = &cobra.Command{
 		Use:   "version",
 		Short: "Print the version",

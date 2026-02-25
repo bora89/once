@@ -144,7 +144,7 @@ func OverlayCenter(bg, fg string, width, height int) string {
 
 		right := ansi.TruncateLeft(bgLine, leftOffset+fgWidth, "")
 
-		bgLines[bgIdx] = left + "\x1b[0m" + fgLine + "\x1b[0m" + right
+		bgLines[bgIdx] = left + ansi.ResetStyle + fgLine + ansi.ResetStyle + right
 	}
 
 	return strings.Join(bgLines, "\n")

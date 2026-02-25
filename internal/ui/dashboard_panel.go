@@ -103,11 +103,11 @@ func (p DashboardPanel) View(selected bool, toggling bool, width int) string {
 	return topTrans + "\n" + lipgloss.JoinHorizontal(lipgloss.Top, indicator, body) + "\n" + bottomTrans
 }
 
-// Private
-
 func (p DashboardPanel) Height(selected bool, width int) int {
 	return lipgloss.Height(p.View(selected, false, width))
 }
+
+// Private
 
 func (p DashboardPanel) renderTopTransition(selected bool, width int) string {
 	if !selected {

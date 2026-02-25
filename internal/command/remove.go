@@ -10,13 +10,12 @@ import (
 )
 
 type RemoveCommand struct {
-	root       *RootCommand
 	cmd        *cobra.Command
 	removeData bool
 }
 
 func NewRemoveCommand(root *RootCommand) *RemoveCommand {
-	r := &RemoveCommand{root: root}
+	r := &RemoveCommand{}
 	r.cmd = &cobra.Command{
 		Use:     "remove <app>",
 		Aliases: []string{"rm"},

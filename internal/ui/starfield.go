@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -17,9 +18,8 @@ const (
 )
 
 var (
-	starBright = "\x1b[38;2;255;255;255m" // white
-	starDim    = "\x1b[38;2;136;136;136m" // grey
-	starReset  = "\x1b[0m"
+	starBrightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
+	starDimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 )
 
 type starfieldTickMsg struct{}
@@ -78,12 +78,10 @@ func (s *Starfield) RenderRow(row, fromCol, toCol int) string {
 			sb.WriteByte(' ')
 		} else {
 			if cell.bright {
-				sb.WriteString(starBright)
+				sb.WriteString(starBrightStyle.Render(string(cell.ch)))
 			} else {
-				sb.WriteString(starDim)
+				sb.WriteString(starDimStyle.Render(string(cell.ch)))
 			}
-			sb.WriteRune(cell.ch)
-			sb.WriteString(starReset)
 		}
 	}
 	return sb.String()
@@ -128,6 +126,8 @@ func (s *Starfield) ComputeGrid() {
 			continue
 		}
 
+		// Map sub-pixel coordinates to braille dot positions.
+		// Each cell is 2 dots wide and 4 dots tall (Unicode braille block U+2800).
 		col := sxi / 2
 		row := syi / 4
 		dotCol := sxi % 2

@@ -10,13 +10,12 @@ import (
 )
 
 type DeployCommand struct {
-	root *RootCommand
 	cmd  *cobra.Command
 	host string
 }
 
 func NewDeployCommand(root *RootCommand) *DeployCommand {
-	d := &DeployCommand{root: root}
+	d := &DeployCommand{}
 	d.cmd = &cobra.Command{
 		Use:   "deploy <image>",
 		Short: "Deploy an application",

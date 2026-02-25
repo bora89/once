@@ -1,12 +1,12 @@
 package ui
 
 import (
-	"fmt"
 	"image/color"
 	"math/rand/v2"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type ProgressBusy struct {
@@ -47,7 +47,7 @@ func (p *ProgressBusy) View() string {
 		return ""
 	}
 
-	return colorToANSI(p.Color) + string(p.pattern) + "\x1b[0m"
+	return lipgloss.NewStyle().Foreground(p.Color).Render(string(p.pattern))
 }
 
 // Private
@@ -67,13 +67,4 @@ func generateBraillePattern(width int) []rune {
 		pattern[i] = rune(0x2800 + rand.IntN(256))
 	}
 	return pattern
-}
-
-func colorToANSI(c color.Color) string {
-	if c == nil {
-		return ""
-	}
-	r, g, b, _ := c.RGBA()
-	r8, g8, b8 := r>>8, g>>8, b>>8
-	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm", r8, g8, b8)
 }

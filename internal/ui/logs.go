@@ -175,8 +175,9 @@ func (m *Logs) handleNormalKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 
 	m.wasAtBottom = m.viewport.AtBottom()
-	m.viewport, _ = m.viewport.Update(msg)
-	return nil
+	var cmd tea.Cmd
+	m.viewport, cmd = m.viewport.Update(msg)
+	return cmd
 }
 
 func (m *Logs) checkForUpdates() {

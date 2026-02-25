@@ -10,12 +10,11 @@ import (
 )
 
 type StartCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewStartCommand(root *RootCommand) *StartCommand {
-	s := &StartCommand{root: root}
+	s := &StartCommand{}
 	s.cmd = &cobra.Command{
 		Use:   "start <app>",
 		Short: "Start an application",

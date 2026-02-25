@@ -56,12 +56,13 @@ func (m *Install) Update(msg tea.Msg) tea.Cmd {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.help.SetWidth(m.width)
-		m.starfield.Update(tea.WindowSizeMsg{Width: m.width, Height: m.middleHeight()})
+		cmds := []tea.Cmd{m.starfield.Update(tea.WindowSizeMsg{Width: m.width, Height: m.middleHeight()})}
 		if m.state == installStateForm {
-			m.form.Update(msg)
+			cmds = append(cmds, m.form.Update(msg))
 		} else {
-			m.activity.Update(msg)
+			cmds = append(cmds, m.activity.Update(msg))
 		}
+		return tea.Batch(cmds...)
 
 	case starfieldTickMsg:
 		return m.starfield.Update(msg)
@@ -89,8 +90,8 @@ func (m *Install) Update(msg tea.Msg) tea.Cmd {
 	case InstallFormSubmitMsg:
 		m.state = installStateActivity
 		m.activity = NewInstallActivity(m.namespace, msg.ImageRef, msg.Hostname)
-		m.activity.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		return m.activity.Init()
+		sizeCmd := m.activity.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return tea.Batch(sizeCmd, m.activity.Init())
 
 	case InstallActivityFailedMsg:
 		m.state = installStateForm
@@ -172,7 +173,6 @@ func (m *Install) renderMiddle(contentView string, middleHeight int) string {
 		fgRow := row - topOffset
 		if fgRow >= 0 && fgRow < fgHeight {
 			sb.WriteString(m.starfield.RenderRow(row, 0, leftOffset))
-			sb.WriteString(starReset)
 
 			fgLine := fgLines[fgRow]
 			if w := ansi.StringWidth(fgLine); w < fgWidth {
@@ -180,7 +180,6 @@ func (m *Install) renderMiddle(contentView string, middleHeight int) string {
 			}
 			sb.WriteString(fgLine)
 
-			sb.WriteString(starReset)
 			sb.WriteString(m.starfield.RenderRow(row, leftOffset+fgWidth, m.width))
 		} else {
 			sb.WriteString(m.starfield.RenderFullRow(row))

@@ -9,12 +9,11 @@ import (
 )
 
 type ListCommand struct {
-	root *RootCommand
-	cmd  *cobra.Command
+	cmd *cobra.Command
 }
 
 func NewListCommand(root *RootCommand) *ListCommand {
-	l := &ListCommand{root: root}
+	l := &ListCommand{}
 	l.cmd = &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
