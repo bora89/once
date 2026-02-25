@@ -14,21 +14,21 @@ import (
 )
 
 var dashboardKeys = struct {
-	Up        key.Binding
-	Down      key.Binding
-	Settings  key.Binding
-	StartStop key.Binding
-	NewApp    key.Binding
-	Logs      key.Binding
-	Quit      key.Binding
+	Up       key.Binding
+	Down     key.Binding
+	Settings key.Binding
+	Actions  key.Binding
+	NewApp   key.Binding
+	Logs     key.Binding
+	Quit     key.Binding
 }{
-	Up:        WithHelp(NewKeyBinding("up", "k"), "↑/k", "up"),
-	Down:      WithHelp(NewKeyBinding("down", "j"), "↓/j", "down"),
-	Settings:  WithHelp(NewKeyBinding("s"), "s", "settings"),
-	StartStop: WithHelp(NewKeyBinding("o"), "o", "start/stop"),
-	NewApp:    WithHelp(NewKeyBinding("n"), "n", "new app"),
-	Logs:      WithHelp(NewKeyBinding("g"), "g", "logs"),
-	Quit:      WithHelp(NewKeyBinding("esc"), "esc", "quit"),
+	Up:       WithHelp(NewKeyBinding("up", "k"), "↑/k", "up"),
+	Down:     WithHelp(NewKeyBinding("down", "j"), "↓/j", "down"),
+	Settings: WithHelp(NewKeyBinding("s"), "s", "settings"),
+	Actions:  WithHelp(NewKeyBinding("a"), "a", "actions"),
+	NewApp:   WithHelp(NewKeyBinding("n"), "n", "new app"),
+	Logs:     WithHelp(NewKeyBinding("g"), "g", "logs"),
+	Quit:     WithHelp(NewKeyBinding("esc"), "esc", "quit"),
 }
 
 type Dashboard struct {
@@ -44,8 +44,7 @@ type Dashboard struct {
 	togglingApp   string
 	progress      *ProgressBusy
 	help          Help
-	showingMenu   bool
-	settingsMenu  SettingsMenu
+	overlay       Component
 }
 
 type dashboardTickMsg struct{}
@@ -89,13 +88,13 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 		m.updateViewportSize()
 		m.rebuildViewportContent()
 
-		if m.showingMenu {
-			cmds = append(cmds, m.settingsMenu.Update(msg))
+		if m.overlay != nil {
+			cmds = append(cmds, m.overlay.Update(msg))
 		}
 
 	case MouseEvent:
-		if m.showingMenu {
-			return m.settingsMenu.Update(msg)
+		if m.overlay != nil {
+			return m.overlay.Update(msg)
 		}
 		if msg.IsClick {
 			if i, ok := m.panelIndexAtY(msg.Y); ok {
@@ -108,9 +107,8 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 		}
 
 	case tea.KeyPressMsg:
-		if m.showingMenu {
-			cmd := m.settingsMenu.Update(msg)
-			return cmd
+		if m.overlay != nil {
+			return m.overlay.Update(msg)
 		}
 
 		if key.Matches(msg, dashboardKeys.Quit) {
@@ -137,31 +135,47 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 		}
 		if key.Matches(msg, dashboardKeys.Settings) && len(m.apps) > 0 {
 			app := m.apps[m.selectedIndex]
-			m.showingMenu = true
-			m.settingsMenu = NewSettingsMenu(app)
-			cmd := m.settingsMenu.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			menu := NewSettingsMenu(app)
+			m.overlay = &menu
+			cmd := m.overlay.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 			return cmd
 		}
-		if key.Matches(msg, dashboardKeys.StartStop) && len(m.apps) > 0 && !m.toggling {
+		if key.Matches(msg, dashboardKeys.Actions) && len(m.apps) > 0 && !m.toggling {
 			app := m.apps[m.selectedIndex]
-			m.toggling = true
-			m.togglingApp = app.Settings.Name
-			m.progress = NewProgressBusy(m.width, Colors.Border)
-			m.updateViewportSize()
-			m.rebuildViewportContent()
-			return tea.Batch(m.progress.Init(), m.runStartStop(app))
+			menu := NewActionsMenu(app)
+			m.overlay = &menu
+			cmd := m.overlay.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			return cmd
 		}
 		if key.Matches(msg, dashboardKeys.Logs) && len(m.apps) > 0 {
 			return func() tea.Msg { return navigateToLogsMsg{app: m.apps[m.selectedIndex]} }
 		}
 
 	case SettingsMenuCloseMsg:
-		m.showingMenu = false
+		m.overlay = nil
 
 	case SettingsMenuSelectMsg:
-		m.showingMenu = false
+		m.overlay = nil
 		return func() tea.Msg {
 			return navigateToSettingsSectionMsg(msg)
+		}
+
+	case ActionsMenuCloseMsg:
+		m.overlay = nil
+
+	case ActionsMenuSelectMsg:
+		m.overlay = nil
+		switch msg.action {
+		case ActionsMenuStartStop:
+			app := msg.app
+			m.toggling = true
+			m.togglingApp = app.Settings.Name
+			m.progress = NewProgressBusy(m.width, Colors.Border)
+			m.updateViewportSize()
+			m.rebuildViewportContent()
+			return tea.Batch(m.progress.Init(), m.runStartStop(app))
+		case ActionsMenuRemove:
+			return func() tea.Msg { return navigateToRemoveMsg{app: msg.app} }
 		}
 
 	case startStopFinishedMsg:
@@ -203,9 +217,8 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 		m.scrollToSelection()
 	}
 
-	if m.showingMenu {
-		cmd := m.settingsMenu.Update(msg)
-		cmds = append(cmds, cmd)
+	if m.overlay != nil {
+		cmds = append(cmds, m.overlay.Update(msg))
 	}
 
 	return tea.Batch(cmds...)
@@ -214,12 +227,24 @@ func (m *Dashboard) Update(msg tea.Msg) tea.Cmd {
 func (m *Dashboard) View() string {
 	titleLine := Styles.TitleRule(m.width)
 
-	helpBindings := []key.Binding{
-		dashboardKeys.Up, dashboardKeys.Down, dashboardKeys.Settings,
-		dashboardKeys.Logs, dashboardKeys.NewApp, dashboardKeys.StartStop, dashboardKeys.Quit,
+	var helpBindings []key.Binding
+	if len(m.apps) > 0 {
+		helpBindings = []key.Binding{
+			dashboardKeys.Up, dashboardKeys.Down, dashboardKeys.Actions,
+			dashboardKeys.Settings, dashboardKeys.Logs, dashboardKeys.NewApp, dashboardKeys.Quit,
+		}
+	} else {
+		helpBindings = []key.Binding{dashboardKeys.NewApp, dashboardKeys.Quit}
 	}
 	helpView := m.help.View(helpBindings)
 	helpLine := Styles.HelpLine(m.width, helpView)
+
+	if len(m.apps) == 0 {
+		emptyMsg := lipgloss.NewStyle().Foreground(Colors.Border).Render("There are no applications installed")
+		middleHeight := m.height - 1 - 1 // title + help
+		centeredContent := lipgloss.Place(m.width, middleHeight, lipgloss.Center, lipgloss.Center, emptyMsg)
+		return titleLine + "\n" + centeredContent + "\n" + helpLine
+	}
 
 	var content string
 	if m.toggling && m.progress != nil {
@@ -228,9 +253,8 @@ func (m *Dashboard) View() string {
 		content = titleLine + "\n" + m.viewport.View() + "\n" + helpLine
 	}
 
-	if m.showingMenu {
-		menuView := m.settingsMenu.View()
-		return OverlayCenter(content, menuView, m.width, m.height)
+	if m.overlay != nil {
+		return OverlayCenter(content, m.overlay.View(), m.width, m.height)
 	}
 
 	return content

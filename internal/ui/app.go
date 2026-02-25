@@ -26,7 +26,10 @@ type (
 	scrapeTickMsg                struct{}
 	scrapeDoneMsg                struct{}
 	navigateToInstallMsg         struct{}
-	navigateToDashboardMsg       struct{ appName string }
+	navigateToDashboardMsg struct {
+		appName    string
+		allowEmpty bool
+	}
 	navigateToAppMsg             struct{ app *docker.Application }
 	navigateToSettingsSectionMsg struct {
 		app     *docker.Application
@@ -35,8 +38,9 @@ type (
 )
 
 type (
-	navigateToLogsMsg struct{ app *docker.Application }
-	quitMsg           struct{}
+	navigateToLogsMsg   struct{ app *docker.Application }
+	navigateToRemoveMsg struct{ app *docker.Application }
+	quitMsg             struct{}
 )
 
 type SettingsSectionType int
@@ -179,23 +183,28 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			slog.Error("refreshing namespace", "err", err)
 		}
 		apps := m.namespace.Applications()
-		if len(apps) > 0 {
-			selectedIndex := 0
-			for i, app := range apps {
-				if app.Settings.Name == msg.appName {
-					selectedIndex = i
-					break
-				}
-			}
-			m.currentScreen = NewDashboard(m.namespace, apps, selectedIndex, m.scraper, m.dockerScraper)
-			sizeCmd := m.currentScreen.Update(m.lastSize)
-			return m, tea.Batch(sizeCmd, m.currentScreen.Init())
+		if len(apps) == 0 && !msg.allowEmpty {
+			m.shutdown()
+			return m, tea.Quit
 		}
-		m.shutdown()
-		return m, tea.Quit
+		selectedIndex := 0
+		for i, app := range apps {
+			if app.Settings.Name == msg.appName {
+				selectedIndex = i
+				break
+			}
+		}
+		m.currentScreen = NewDashboard(m.namespace, apps, selectedIndex, m.scraper, m.dockerScraper)
+		sizeCmd := m.currentScreen.Update(m.lastSize)
+		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 
 	case navigateToSettingsSectionMsg:
 		m.currentScreen = NewSettings(m.namespace, msg.app, msg.section)
+		sizeCmd := m.currentScreen.Update(m.lastSize)
+		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
+
+	case navigateToRemoveMsg:
+		m.currentScreen = NewRemove(m.namespace, msg.app)
 		sizeCmd := m.currentScreen.Update(m.lastSize)
 		return m, tea.Batch(sizeCmd, m.currentScreen.Init())
 

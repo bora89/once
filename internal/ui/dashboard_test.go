@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/basecamp/once/internal/docker"
 	"github.com/basecamp/once/internal/metrics"
@@ -84,6 +86,89 @@ func TestDashboardKeyboardJK(t *testing.T) {
 
 	d.Update(runeKeyMsg('k'))
 	assert.Equal(t, 0, d.selectedIndex)
+}
+
+func TestDashboard_ActionsMenuOpensOnA(t *testing.T) {
+	d := testDashboard(1)
+	d.width = 80
+	d.height = 40
+	d.updateViewportSize()
+	d.rebuildViewportContent()
+
+	d.Update(runeKeyMsg('a'))
+	assert.NotNil(t, d.overlay)
+}
+
+func TestDashboard_ActionsMenuCloses(t *testing.T) {
+	d := testDashboard(1)
+	d.width = 80
+	d.height = 40
+	d.updateViewportSize()
+	d.rebuildViewportContent()
+
+	d.Update(runeKeyMsg('a'))
+	assert.NotNil(t, d.overlay)
+
+	d.Update(ActionsMenuCloseMsg{})
+	assert.Nil(t, d.overlay)
+}
+
+func TestDashboard_ActionsMenuStartStop(t *testing.T) {
+	d := testDashboard(1)
+	d.width = 80
+	d.height = 40
+	d.updateViewportSize()
+	d.rebuildViewportContent()
+
+	d.Update(ActionsMenuSelectMsg{app: d.apps[0], action: ActionsMenuStartStop})
+	assert.True(t, d.toggling)
+}
+
+func TestDashboard_ActionsMenuRemove(t *testing.T) {
+	d := testDashboard(1)
+	d.width = 80
+	d.height = 40
+	d.updateViewportSize()
+	d.rebuildViewportContent()
+
+	cmd := d.Update(ActionsMenuSelectMsg{app: d.apps[0], action: ActionsMenuRemove})
+	require.NotNil(t, cmd)
+
+	msg := cmd()
+	navMsg, ok := msg.(navigateToRemoveMsg)
+	require.True(t, ok, "expected navigateToRemoveMsg, got %T", msg)
+	assert.Equal(t, d.apps[0], navMsg.app)
+}
+
+func TestDashboard_OldStartStopKeyRemoved(t *testing.T) {
+	d := testDashboard(1)
+	d.width = 80
+	d.height = 40
+	d.updateViewportSize()
+	d.rebuildViewportContent()
+
+	d.Update(runeKeyMsg('o'))
+	assert.False(t, d.toggling)
+}
+
+func TestDashboard_SettingsMenuStillWorks(t *testing.T) {
+	d := testDashboard(1)
+	d.width = 80
+	d.height = 40
+	d.updateViewportSize()
+	d.rebuildViewportContent()
+
+	d.Update(runeKeyMsg('s'))
+	assert.NotNil(t, d.overlay)
+}
+
+func TestDashboard_EmptyStateShowsMessage(t *testing.T) {
+	d := testDashboard(0)
+	d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	view := d.View()
+	assert.Contains(t, view, "There are no applications installed")
+	assert.Contains(t, view, "new app")
 }
 
 // Helpers
