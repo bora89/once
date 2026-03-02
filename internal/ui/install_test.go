@@ -48,7 +48,7 @@ func TestInstall_FailureReturnsToFormWithError(t *testing.T) {
 	installErr := errors.New("connection refused")
 	cmd := m.Update(InstallActivityFailedMsg{Err: installErr})
 
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "expected logo Init cmd on failure return")
 	assert.Equal(t, installStateForm, m.state)
 	assert.Equal(t, installErr, m.err)
 	assert.Contains(t, m.View(), "Error: connection refused")

@@ -32,6 +32,7 @@ type Install struct {
 	form          *InstallForm
 	activity      *InstallActivity
 	starfield     *Starfield
+	logo          *Logo
 	err           error
 	cliMode       bool
 }
@@ -43,12 +44,13 @@ func NewInstall(ns *docker.Namespace, imageRef string) *Install {
 		state:     installStateForm,
 		form:      NewInstallForm(imageRef),
 		starfield: NewStarfield(),
+		logo:      NewLogo(),
 		cliMode:   imageRef != "",
 	}
 }
 
 func (m *Install) Init() tea.Cmd {
-	return tea.Batch(m.form.Init(), m.starfield.Init())
+	return tea.Batch(m.form.Init(), m.starfield.Init(), m.logo.Init())
 }
 
 func (m *Install) Update(msg tea.Msg) tea.Cmd {
@@ -66,6 +68,12 @@ func (m *Install) Update(msg tea.Msg) tea.Cmd {
 
 	case starfieldTickMsg:
 		return m.starfield.Update(msg)
+
+	case logoShineStartMsg, logoShineStepMsg:
+		if m.state == installStateForm {
+			return m.logo.Update(msg)
+		}
+		return nil
 
 	case MouseEvent:
 		if m.state == installStateForm {
@@ -97,7 +105,7 @@ func (m *Install) Update(msg tea.Msg) tea.Cmd {
 		m.state = installStateForm
 		m.activity = nil
 		m.err = msg.Err
-		return nil
+		return m.logo.Init()
 
 	case InstallActivityDoneMsg:
 		return func() tea.Msg { return NavigateToAppMsg(msg) }
@@ -117,12 +125,12 @@ func (m *Install) View() string {
 
 	var contentView string
 	if m.state == installStateForm {
+		formView := m.form.View()
 		if m.err != nil {
 			errorLine := lipgloss.NewStyle().Foreground(Colors.Error).Render("Error: " + m.err.Error())
-			contentView = lipgloss.JoinVertical(lipgloss.Center, errorLine, "", m.form.View())
-		} else {
-			contentView = m.form.View()
+			formView = lipgloss.JoinVertical(lipgloss.Center, errorLine, "", formView)
 		}
+		contentView = lipgloss.JoinVertical(lipgloss.Center, m.logo.View(), "", formView)
 	} else {
 		contentView = m.activity.View()
 	}
