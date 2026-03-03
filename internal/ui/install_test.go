@@ -15,8 +15,8 @@ func TestInstall_SubmitTriggersActivity(t *testing.T) {
 	m := newTestInstall()
 	assert.Equal(t, installStateForm, m.state)
 
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	m.Update(InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
+	m, _ = updateInstall(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = updateInstall(m, InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
 	assert.Equal(t, installStateActivity, m.state)
 }
 
@@ -24,7 +24,7 @@ func TestInstall_SuccessNavigatesToApp(t *testing.T) {
 	m := newTestInstall()
 	app := &docker.Application{}
 
-	cmd := m.Update(InstallActivityDoneMsg{App: app})
+	_, cmd := updateInstall(m, InstallActivityDoneMsg{App: app})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -37,16 +37,16 @@ func TestInstall_FailureReturnsToFormWithError(t *testing.T) {
 	m := newTestInstall()
 
 	// Fill the form fields before submitting
-	fillInstallForm(m.form, "nginx:latest", "app.example.com")
+	fillInstallForm(&m.form, "nginx:latest", "app.example.com")
 
 	// Submit to enter activity state
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	m.Update(InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
+	m, _ = updateInstall(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = updateInstall(m, InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
 	assert.Equal(t, installStateActivity, m.state)
 
 	// Simulate failure
 	installErr := errors.New("connection refused")
-	cmd := m.Update(InstallActivityFailedMsg{Err: installErr})
+	m, cmd := updateInstall(m, InstallActivityFailedMsg{Err: installErr})
 
 	assert.NotNil(t, cmd, "expected logo Init cmd on failure return")
 	assert.Equal(t, installStateForm, m.state)
@@ -62,14 +62,14 @@ func TestInstall_ErrorClearsOnKeypress(t *testing.T) {
 	m := newTestInstall()
 	m.err = errors.New("some error")
 
-	m.Update(runeKeyMsg('a'))
+	m, _ = updateInstall(m, runeKeyMsg('a'))
 	assert.Nil(t, m.err)
 }
 
 func TestInstall_EscNavigatesToDashboard(t *testing.T) {
 	m := newTestInstall()
 
-	cmd := m.Update(keyPressMsg("esc"))
+	_, cmd := updateInstall(m, keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -80,7 +80,7 @@ func TestInstall_EscNavigatesToDashboard(t *testing.T) {
 func TestInstall_CancelNavigatesToDashboard(t *testing.T) {
 	m := newTestInstall()
 
-	cmd := m.Update(InstallFormCancelMsg{})
+	_, cmd := updateInstall(m, InstallFormCancelMsg{})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -91,7 +91,7 @@ func TestInstall_CancelNavigatesToDashboard(t *testing.T) {
 func TestInstall_EscQuitsWhenImageRefSet(t *testing.T) {
 	m := NewInstall(nil, "nginx:latest")
 
-	cmd := m.Update(keyPressMsg("esc"))
+	_, cmd := updateInstall(m, keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -101,9 +101,9 @@ func TestInstall_EscQuitsWhenImageRefSet(t *testing.T) {
 
 func TestInstall_EscNavigatesToDashboardEvenWithFieldsFilled(t *testing.T) {
 	m := newTestInstall()
-	fillInstallForm(m.form, "nginx:latest", "app.example.com")
+	fillInstallForm(&m.form, "nginx:latest", "app.example.com")
 
-	cmd := m.Update(keyPressMsg("esc"))
+	_, cmd := updateInstall(m, keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -114,7 +114,7 @@ func TestInstall_EscNavigatesToDashboardEvenWithFieldsFilled(t *testing.T) {
 func TestInstall_CancelQuitsWhenImageRefSet(t *testing.T) {
 	m := NewInstall(nil, "nginx:latest")
 
-	cmd := m.Update(InstallFormCancelMsg{})
+	_, cmd := updateInstall(m, InstallFormCancelMsg{})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -124,7 +124,7 @@ func TestInstall_CancelQuitsWhenImageRefSet(t *testing.T) {
 
 func TestInstall_ShowsLogoAndHidesTitleWhenNoApps(t *testing.T) {
 	m := NewInstall(nil, "")
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m, _ = updateInstall(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	view := m.View()
 	assert.Contains(t, view, "██████╗")
@@ -134,7 +134,7 @@ func TestInstall_ShowsLogoAndHidesTitleWhenNoApps(t *testing.T) {
 func TestInstall_ShowsTitleAndHidesLogoWhenAppsExist(t *testing.T) {
 	ns := newTestNamespace("myapp")
 	m := NewInstall(ns, "")
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m, _ = updateInstall(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	view := m.View()
 	assert.NotContains(t, view, "██████╗")
@@ -143,21 +143,21 @@ func TestInstall_ShowsTitleAndHidesLogoWhenAppsExist(t *testing.T) {
 
 func TestInstall_FailureRestartsLogoOnlyWhenNoApps(t *testing.T) {
 	noApps := NewInstall(nil, "")
-	noApps.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
-	noApps.Update(InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
-	cmd := noApps.Update(InstallActivityFailedMsg{Err: errors.New("fail")})
+	noApps, _ = updateInstall(noApps, tea.WindowSizeMsg{Width: 80, Height: 40})
+	noApps, _ = updateInstall(noApps, InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
+	_, cmd := updateInstall(noApps, InstallActivityFailedMsg{Err: errors.New("fail")})
 	assert.NotNil(t, cmd)
 
 	withApps := NewInstall(newTestNamespace("myapp"), "")
-	withApps.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
-	withApps.Update(InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
-	cmd = withApps.Update(InstallActivityFailedMsg{Err: errors.New("fail")})
+	withApps, _ = updateInstall(withApps, tea.WindowSizeMsg{Width: 80, Height: 40})
+	withApps, _ = updateInstall(withApps, InstallFormSubmitMsg{ImageRef: "nginx:latest", Hostname: "app.example.com"})
+	_, cmd = updateInstall(withApps, InstallActivityFailedMsg{Err: errors.New("fail")})
 	assert.Nil(t, cmd)
 }
 
 // Helpers
 
-func newTestInstall() *Install {
+func newTestInstall() Install {
 	return NewInstall(nil, "")
 }
 
@@ -176,4 +176,9 @@ func fillInstallForm(form *InstallForm, imageRef, hostname string) {
 	installTypeText(form, imageRef)
 	installPressEnter(form)
 	installTypeText(form, hostname)
+}
+
+func updateInstall(m Install, msg tea.Msg) (Install, tea.Cmd) {
+	comp, cmd := m.Update(msg)
+	return comp.(Install), cmd
 }

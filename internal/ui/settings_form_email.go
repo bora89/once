@@ -16,10 +16,9 @@ const (
 
 type SettingsFormEmail struct {
 	settingsFormBase
-	settings docker.ApplicationSettings
 }
 
-func NewSettingsFormEmail(settings docker.ApplicationSettings) *SettingsFormEmail {
+func NewSettingsFormEmail(settings docker.ApplicationSettings) SettingsFormEmail {
 	serverField := NewTextField("smtp.example.com")
 	serverField.SetValue(settings.SMTP.Server)
 
@@ -37,7 +36,7 @@ func NewSettingsFormEmail(settings docker.ApplicationSettings) *SettingsFormEmai
 	fromField := NewTextField("noreply@example.com")
 	fromField.SetValue(settings.SMTP.From)
 
-	m := &SettingsFormEmail{
+	m := SettingsFormEmail{
 		settingsFormBase: settingsFormBase{
 			title: "Email",
 			form: NewForm("Done",
@@ -48,20 +47,26 @@ func NewSettingsFormEmail(settings docker.ApplicationSettings) *SettingsFormEmai
 				FormItem{Label: "SMTP From", Field: fromField},
 			),
 		},
-		settings: settings,
 	}
 
-	m.form.OnSubmit(func() tea.Cmd {
-		m.settings.SMTP.Server = m.form.TextField(emailServerField).Value()
-		m.settings.SMTP.Port = m.form.TextField(emailPortField).Value()
-		m.settings.SMTP.Username = m.form.TextField(emailUsernameField).Value()
-		m.settings.SMTP.Password = m.form.TextField(emailPasswordField).Value()
-		m.settings.SMTP.From = m.form.TextField(emailFromField).Value()
-		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: m.settings} }
+	m.form.OnSubmit(func(f *Form) tea.Cmd {
+		s := settings
+		s.SMTP.Server = f.TextField(emailServerField).Value()
+		s.SMTP.Port = f.TextField(emailPortField).Value()
+		s.SMTP.Username = f.TextField(emailUsernameField).Value()
+		s.SMTP.Password = f.TextField(emailPasswordField).Value()
+		s.SMTP.From = f.TextField(emailFromField).Value()
+		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: s} }
 	})
-	m.form.OnCancel(func() tea.Cmd {
+	m.form.OnCancel(func(f *Form) tea.Cmd {
 		return func() tea.Msg { return SettingsSectionCancelMsg{} }
 	})
 
 	return m
+}
+
+func (m SettingsFormEmail) Update(msg tea.Msg) (SettingsSection, tea.Cmd) {
+	var cmd tea.Cmd
+	m.settingsFormBase, cmd = m.update(msg)
+	return m, cmd
 }

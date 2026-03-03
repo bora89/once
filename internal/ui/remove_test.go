@@ -13,7 +13,7 @@ import (
 
 func TestRemove_ViewShowsConfirmation(t *testing.T) {
 	m := newTestRemove()
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = updateRemove(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	view := m.View()
 	assert.Contains(t, view, "Remove application and data?")
@@ -24,7 +24,7 @@ func TestRemove_ViewShowsConfirmation(t *testing.T) {
 func TestRemove_CancelNavigatesToDashboard(t *testing.T) {
 	m := newTestRemove()
 
-	cmd := m.Update(ConfirmationCancelMsg{})
+	_, cmd := updateRemove(m, ConfirmationCancelMsg{})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -36,7 +36,7 @@ func TestRemove_CancelNavigatesToDashboard(t *testing.T) {
 func TestRemove_EscNavigatesToDashboard(t *testing.T) {
 	m := newTestRemove()
 
-	cmd := m.Update(keyPressMsg("esc"))
+	_, cmd := updateRemove(m, keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -47,16 +47,16 @@ func TestRemove_EscNavigatesToDashboard(t *testing.T) {
 
 func TestRemove_ConfirmStartsRemoval(t *testing.T) {
 	m := newTestRemove()
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = updateRemove(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	m.Update(ConfirmationConfirmMsg{})
+	m, _ = updateRemove(m, ConfirmationConfirmMsg{})
 	assert.True(t, m.removing)
 }
 
 func TestRemove_SuccessNavigatesToDashboard(t *testing.T) {
 	m := newTestRemove()
 
-	cmd := m.Update(removeFinishedMsg{err: nil})
+	_, cmd := updateRemove(m, removeFinishedMsg{err: nil})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -68,10 +68,10 @@ func TestRemove_SuccessNavigatesToDashboard(t *testing.T) {
 
 func TestRemove_ErrorShowsErrorAndReturnsToConfirmation(t *testing.T) {
 	m := newTestRemove()
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = updateRemove(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m.removing = true
 
-	m.Update(removeFinishedMsg{err: errors.New("permission denied")})
+	m, _ = updateRemove(m, removeFinishedMsg{err: errors.New("permission denied")})
 
 	assert.False(t, m.removing)
 	assert.Error(t, m.err)
@@ -80,7 +80,7 @@ func TestRemove_ErrorShowsErrorAndReturnsToConfirmation(t *testing.T) {
 
 // Helpers
 
-func newTestRemove() *Remove {
+func newTestRemove() Remove {
 	app := &docker.Application{
 		Settings: docker.ApplicationSettings{
 			Name: "test-app",
@@ -88,4 +88,9 @@ func newTestRemove() *Remove {
 		},
 	}
 	return NewRemove(nil, app)
+}
+
+func updateRemove(m Remove, msg tea.Msg) (Remove, tea.Cmd) {
+	comp, cmd := m.Update(msg)
+	return comp.(Remove), cmd
 }

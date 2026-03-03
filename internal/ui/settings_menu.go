@@ -24,6 +24,8 @@ type SettingsMenu struct {
 }
 
 func NewSettingsMenu(app *docker.Application) SettingsMenu {
+	h := NewHelp()
+	h.SetBindings([]key.Binding{settingsMenuCloseKey})
 	return SettingsMenu{
 		app: app,
 		menu: NewMenu(
@@ -34,34 +36,38 @@ func NewSettingsMenu(app *docker.Application) SettingsMenu {
 			MenuItem{Label: "Updates", Key: int(SettingsSectionUpdates), Shortcut: WithHelp(NewKeyBinding("u"), "u", "")},
 			MenuItem{Label: "Backups", Key: int(SettingsSectionBackups), Shortcut: WithHelp(NewKeyBinding("b"), "b", "")},
 		),
-		help: NewHelp(),
+		help: h,
 	}
 }
 
-func (m *SettingsMenu) Init() tea.Cmd {
+func (m SettingsMenu) Init() tea.Cmd {
 	return nil
 }
 
-func (m *SettingsMenu) Update(msg tea.Msg) tea.Cmd {
+func (m SettingsMenu) Update(msg tea.Msg) (Component, tea.Cmd) {
 	switch msg := msg.(type) {
 	case MouseEvent:
-		if cmd := m.help.Update(msg); cmd != nil {
-			return cmd
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
 
 	case tea.KeyPressMsg:
 		if key.Matches(msg, settingsMenuCloseKey) {
-			return func() tea.Msg { return SettingsMenuCloseMsg{} }
+			return m, func() tea.Msg { return SettingsMenuCloseMsg{} }
 		}
 
 	case MenuSelectMsg:
-		return m.selectSection(SettingsSectionType(msg.Key))
+		return m, m.selectSection(SettingsSectionType(msg.Key))
 	}
 
-	return m.menu.Update(msg)
+	var cmd tea.Cmd
+	m.menu, cmd = m.menu.Update(msg)
+	return m, cmd
 }
 
-func (m *SettingsMenu) View() string {
+func (m SettingsMenu) View() string {
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(Colors.Border).
@@ -76,7 +82,7 @@ func (m *SettingsMenu) View() string {
 
 	menuView := m.menu.View()
 
-	helpView := m.help.View([]key.Binding{settingsMenuCloseKey})
+	helpView := m.help.View()
 	menuWidth := lipgloss.Width(menuView)
 	helpLine := lipgloss.NewStyle().MarginTop(1).Width(menuWidth).Align(lipgloss.Center).Render(helpView)
 
@@ -91,7 +97,7 @@ func (m *SettingsMenu) View() string {
 
 // Private
 
-func (m *SettingsMenu) selectSection(section SettingsSectionType) tea.Cmd {
+func (m SettingsMenu) selectSection(section SettingsSectionType) tea.Cmd {
 	return func() tea.Msg {
 		return SettingsMenuSelectMsg{app: m.app, section: section}
 	}

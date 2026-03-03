@@ -209,12 +209,12 @@ type Form struct {
 	width        int
 	errorField   int
 	error        string
-	onSubmit     func() tea.Cmd
-	onCancel     func() tea.Cmd
+	onSubmit     func(f *Form) tea.Cmd
+	onCancel     func(f *Form) tea.Cmd
 }
 
-func NewForm(submitLabel string, items ...FormItem) *Form {
-	f := &Form{
+func NewForm(submitLabel string, items ...FormItem) Form {
+	f := Form{
 		items:       items,
 		submitLabel: submitLabel,
 	}
@@ -230,14 +230,14 @@ func NewForm(submitLabel string, items ...FormItem) *Form {
 	return f
 }
 
-func (f *Form) Init() tea.Cmd {
+func (f Form) Init() tea.Cmd {
 	if f.focused < len(f.items) {
 		return f.items[f.focused].Field.Focus()
 	}
 	return nil
 }
 
-func (f *Form) Update(msg tea.Msg) tea.Cmd {
+func (f Form) Update(msg tea.Msg) (Form, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		f.width = msg.Width
@@ -266,13 +266,13 @@ func (f *Form) Update(msg tea.Msg) tea.Cmd {
 		if _, isKey := msg.(tea.KeyPressMsg); isKey {
 			f.clearErrorOnInput()
 		}
-		return f.items[f.focused].Field.Update(msg)
+		return f, f.items[f.focused].Field.Update(msg)
 	}
 
-	return nil
+	return f, nil
 }
 
-func (f *Form) View() string {
+func (f Form) View() string {
 	var parts []string
 
 	errorStyle := lipgloss.NewStyle().Foreground(Colors.Error)
@@ -320,103 +320,103 @@ func (f *Form) SetActionButton(label string, onPress func() tea.Msg) {
 	f.actionButton = &FormActionButton{Label: label, OnPress: onPress}
 }
 
-func (f *Form) OnSubmit(fn func() tea.Cmd) {
+func (f *Form) OnSubmit(fn func(f *Form) tea.Cmd) {
 	f.onSubmit = fn
 }
 
-func (f *Form) OnCancel(fn func() tea.Cmd) {
+func (f *Form) OnCancel(fn func(f *Form) tea.Cmd) {
 	f.onCancel = fn
 }
 
-func (f *Form) Focused() int {
+func (f Form) Focused() int {
 	return f.focused
 }
 
-func (f *Form) Field(i int) FormField {
+func (f Form) Field(i int) FormField {
 	return f.items[i].Field
 }
 
-func (f *Form) TextField(i int) *TextField {
+func (f Form) TextField(i int) *TextField {
 	return f.items[i].Field.(*TextField)
 }
 
-func (f *Form) CheckboxField(i int) *CheckboxField {
+func (f Form) CheckboxField(i int) *CheckboxField {
 	return f.items[i].Field.(*CheckboxField)
 }
 
-func (f *Form) HasError() bool {
+func (f Form) HasError() bool {
 	return f.error != ""
 }
 
-func (f *Form) Error() string {
+func (f Form) Error() string {
 	return f.error
 }
 
 // Private
 
-func (f *Form) focusNext() tea.Cmd {
+func (f Form) focusNext() (Form, tea.Cmd) {
 	f.blurCurrent()
 	f.focused = (f.focused + 1) % f.totalCount()
 	return f.focusToNextFocusable()
 }
 
-func (f *Form) focusPrev() tea.Cmd {
+func (f Form) focusPrev() (Form, tea.Cmd) {
 	f.blurCurrent()
 	f.focused = (f.focused - 1 + f.totalCount()) % f.totalCount()
 	return f.focusToNextFocusable()
 }
 
-func (f *Form) blurCurrent() {
+func (f Form) blurCurrent() {
 	if f.focused < len(f.items) {
 		f.items[f.focused].Field.Blur()
 	}
 }
 
-func (f *Form) focusCurrent() tea.Cmd {
+func (f Form) focusCurrent() tea.Cmd {
 	if f.focused < len(f.items) {
 		return f.items[f.focused].Field.Focus()
 	}
 	return nil
 }
 
-func (f *Form) focusToNextFocusable() tea.Cmd {
+func (f Form) focusToNextFocusable() (Form, tea.Cmd) {
 	start := f.focused
 	for {
 		if f.focused < len(f.items) {
 			if f.items[f.focused].Field.IsFocusable() {
-				return f.focusCurrent()
+				return f, f.focusCurrent()
 			}
 			f.focused = (f.focused + 1) % f.totalCount()
 		} else {
-			return nil
+			return f, nil
 		}
 
 		if f.focused == start {
-			return nil
+			return f, nil
 		}
 	}
 }
 
-func (f *Form) handleEnter() tea.Cmd {
+func (f Form) handleEnter() (Form, tea.Cmd) {
 	switch {
 	case f.focused < len(f.items):
 		return f.focusNext()
 	case f.actionButton != nil && f.focused == f.actionIndex():
-		return func() tea.Msg { return f.actionButton.OnPress() }
+		return f, func() tea.Msg { return f.actionButton.OnPress() }
 	case f.focused == f.submitIndex():
 		return f.submitIfValid()
 	case f.focused == f.cancelIndex():
 		if f.onCancel != nil {
-			return f.onCancel()
+			return f, f.onCancel(&f)
 		}
-		return nil
+		return f, nil
 	}
-	return nil
+	return f, nil
 }
 
-func (f *Form) handleClick(target string) tea.Cmd {
+func (f Form) handleClick(target string) (Form, tea.Cmd) {
 	if target == "" {
-		return nil
+		return f, nil
 	}
 
 	for i := range f.items {
@@ -437,17 +437,17 @@ func (f *Form) handleClick(target string) tea.Cmd {
 		if f.actionButton != nil {
 			f.blurCurrent()
 			f.focused = f.actionIndex()
-			return func() tea.Msg { return f.actionButton.OnPress() }
+			return f, func() tea.Msg { return f.actionButton.OnPress() }
 		}
 	case "cancel":
 		f.blurCurrent()
 		f.focused = f.cancelIndex()
 		if f.onCancel != nil {
-			return f.onCancel()
+			return f, f.onCancel(&f)
 		}
 	}
 
-	return nil
+	return f, nil
 }
 
 func (f *Form) clearErrorOnInput() {
@@ -456,17 +456,19 @@ func (f *Form) clearErrorOnInput() {
 	}
 }
 
-func (f *Form) submitIfValid() tea.Cmd {
-	if !f.validate() {
+func (f Form) submitIfValid() (Form, tea.Cmd) {
+	var valid bool
+	f, valid = f.validate()
+	if !valid {
 		return f.focusIndex(f.errorField)
 	}
 	if f.onSubmit != nil {
-		return f.onSubmit()
+		return f, f.onSubmit(&f)
 	}
-	return nil
+	return f, nil
 }
 
-func (f *Form) validate() bool {
+func (f Form) validate() (Form, bool) {
 	f.error = ""
 
 	for i, item := range f.items {
@@ -477,35 +479,35 @@ func (f *Form) validate() bool {
 			if strings.TrimSpace(v.Value()) == "" {
 				f.errorField = i
 				f.error = item.Label + " is required"
-				return false
+				return f, false
 			}
 		}
 	}
 
-	return true
+	return f, true
 }
 
-func (f *Form) focusIndex(i int) tea.Cmd {
+func (f Form) focusIndex(i int) (Form, tea.Cmd) {
 	if i == f.focused {
-		return nil
+		return f, nil
 	}
 	f.blurCurrent()
 	f.focused = i
-	return f.focusCurrent()
+	return f, f.focusCurrent()
 }
 
-func (f *Form) submitIndex() int { return len(f.items) }
+func (f Form) submitIndex() int { return len(f.items) }
 
-func (f *Form) actionIndex() int { return len(f.items) + 1 }
+func (f Form) actionIndex() int { return len(f.items) + 1 }
 
-func (f *Form) cancelIndex() int {
+func (f Form) cancelIndex() int {
 	if f.actionButton != nil {
 		return len(f.items) + 2
 	}
 	return len(f.items) + 1
 }
 
-func (f *Form) totalCount() int {
+func (f Form) totalCount() int {
 	return f.cancelIndex() + 1
 }
 

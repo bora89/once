@@ -41,7 +41,7 @@ type Logs struct {
 
 type logsTickMsg struct{}
 
-func NewLogs(ns *docker.Namespace, app *docker.Application) *Logs {
+func NewLogs(ns *docker.Namespace, app *docker.Application) Logs {
 	streamer := docker.NewLogStreamer(ns, docker.LogStreamerSettings{})
 
 	filterInput := textinput.New()
@@ -54,19 +54,21 @@ func NewLogs(ns *docker.Namespace, app *docker.Application) *Logs {
 	vp.KeyMap = viewport.KeyMap{}
 	vp.SoftWrap = true
 
-	return &Logs{
+	h := NewHelp()
+	h.SetBindings(logsHelpBindings(true))
+	return Logs{
 		namespace:     ns,
 		app:           app,
 		streamer:      streamer,
 		viewport:      vp,
 		filterInput:   filterInput,
 		filterEnabled: true,
-		help:          NewHelp(),
+		help:          h,
 		wasAtBottom:   true,
 	}
 }
 
-func (m *Logs) Init() tea.Cmd {
+func (m Logs) Init() tea.Cmd {
 	containerName, err := m.app.ContainerName(context.Background())
 	if err == nil {
 		m.streamer.Start(context.Background(), containerName)
@@ -74,7 +76,7 @@ func (m *Logs) Init() tea.Cmd {
 	return m.scheduleNextLogsTick()
 }
 
-func (m *Logs) Update(msg tea.Msg) tea.Cmd {
+func (m Logs) Update(msg tea.Msg) (Component, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -85,8 +87,10 @@ func (m *Logs) Update(msg tea.Msg) tea.Cmd {
 		m.rebuildContent()
 
 	case MouseEvent:
-		if cmd := m.help.Update(msg); cmd != nil {
-			return cmd
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
 
 	case tea.KeyPressMsg:
@@ -106,18 +110,13 @@ func (m *Logs) Update(msg tea.Msg) tea.Cmd {
 		}
 	}
 
-	return tea.Batch(cmds...)
+	return m, tea.Batch(cmds...)
 }
 
-func (m *Logs) View() string {
+func (m Logs) View() string {
 	titleLine := Styles.TitleRule(m.width, m.app.Settings.Host, "logs")
 
-	helpBindings := []key.Binding{logsKeys.Back}
-	if m.filterEnabled {
-		helpBindings = append([]key.Binding{logsKeys.Filter}, helpBindings...)
-	}
-	helpView := m.help.View(helpBindings)
-	helpLine := Styles.CenteredLine(m.width, helpView)
+	helpLine := Styles.CenteredLine(m.width, m.help.View())
 
 	header := titleLine + "\n"
 	if m.filterActive || m.filterText != "" {
@@ -141,44 +140,46 @@ func (m *Logs) View() string {
 
 // Private
 
-func (m *Logs) scheduleNextLogsTick() tea.Cmd {
+func (m Logs) scheduleNextLogsTick() tea.Cmd {
 	return tea.Every(100*time.Millisecond, func(time.Time) tea.Msg { return logsTickMsg{} })
 }
 
-func (m *Logs) handleFilterKey(msg tea.KeyPressMsg) tea.Cmd {
+func (m Logs) handleFilterKey(msg tea.KeyPressMsg) (Component, tea.Cmd) {
 	if key.Matches(msg, NewKeyBinding("esc")) {
 		m.filterActive = false
 		m.filterEnabled = true
 		m.filterText = ""
 		m.filterInput.SetValue("")
 		m.filterInput.Blur()
+		m.help.SetBindings(logsHelpBindings(m.filterEnabled))
 		m.rebuildContent()
-		return nil
+		return m, nil
 	}
 
 	var cmd tea.Cmd
 	m.filterInput, cmd = m.filterInput.Update(msg)
 	m.filterText = m.filterInput.Value()
 	m.rebuildContent()
-	return cmd
+	return m, cmd
 }
 
-func (m *Logs) handleNormalKey(msg tea.KeyPressMsg) tea.Cmd {
+func (m Logs) handleNormalKey(msg tea.KeyPressMsg) (Component, tea.Cmd) {
 	switch {
 	case key.Matches(msg, logsKeys.Back):
 		m.streamer.Stop()
-		return func() tea.Msg { return NavigateToDashboardMsg{AppName: m.app.Settings.Name} }
+		return m, func() tea.Msg { return NavigateToDashboardMsg{AppName: m.app.Settings.Name} }
 
 	case key.Matches(msg, logsKeys.Filter) && m.filterEnabled:
 		m.filterActive = true
 		m.filterEnabled = false
-		return m.filterInput.Focus()
+		m.help.SetBindings(logsHelpBindings(m.filterEnabled))
+		return m, m.filterInput.Focus()
 	}
 
 	m.wasAtBottom = m.viewport.AtBottom()
 	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
-	return cmd
+	return m, cmd
 }
 
 func (m *Logs) checkForUpdates() {
@@ -227,8 +228,16 @@ func (m *Logs) rebuildContent() {
 	}
 }
 
-func (m *Logs) centeredMessage(msg string) string {
+func (m Logs) centeredMessage(msg string) string {
 	return lipgloss.Place(m.viewport.Width(), m.viewport.Height(), lipgloss.Center, lipgloss.Center, msg)
+}
+
+func logsHelpBindings(filterEnabled bool) []key.Binding {
+	bindings := []key.Binding{logsKeys.Back}
+	if filterEnabled {
+		bindings = append([]key.Binding{logsKeys.Filter}, bindings...)
+	}
+	return bindings
 }
 
 func (m *Logs) updateViewportSize() {

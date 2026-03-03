@@ -24,26 +24,28 @@ func (h *Help) SetWidth(w int) {
 	h.width = w
 }
 
-func (h *Help) Update(msg tea.Msg) tea.Cmd {
+func (h Help) Update(msg tea.Msg) (Help, tea.Cmd) {
 	if msg, ok := msg.(MouseEvent); ok {
 		if msg.IsClick {
 			for i, kb := range h.bindings {
 				keys := kb.Keys()
 				if msg.Target == helpTarget(i) && len(keys) > 0 {
 					first := keys[0]
-					return func() tea.Msg {
+					return h, func() tea.Msg {
 						return tea.KeyPressMsg(tea.Key{Text: first})
 					}
 				}
 			}
 		}
 	}
-	return nil
+	return h, nil
 }
 
-func (h *Help) View(bindings []key.Binding) string {
+func (h *Help) SetBindings(bindings []key.Binding) {
 	h.bindings = bindings
+}
 
+func (h Help) View() string {
 	keyStyle := lipgloss.NewStyle().Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(Colors.Border)
 	separator := descStyle.Render(" • ")
@@ -56,7 +58,7 @@ func (h *Help) View(bindings []key.Binding) string {
 	}
 
 	var items []helpItem
-	for i, kb := range bindings {
+	for i, kb := range h.bindings {
 		help := kb.Help()
 		if help.Key == "" {
 			continue

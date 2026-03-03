@@ -15,16 +15,15 @@ const (
 
 type SettingsFormBackups struct {
 	settingsFormBase
-	settings docker.ApplicationSettings
 }
 
-func NewSettingsFormBackups(app *docker.Application, lastResult *docker.OperationResult) *SettingsFormBackups {
+func NewSettingsFormBackups(app *docker.Application, lastResult *docker.OperationResult) SettingsFormBackups {
 	pathField := NewTextField("/path/to/backups")
 	pathField.SetValue(app.Settings.Backup.Path)
 
 	autoBackField := NewCheckboxField("Automatically create backups", app.Settings.Backup.AutoBack)
 
-	m := &SettingsFormBackups{
+	m := SettingsFormBackups{
 		settingsFormBase: settingsFormBase{
 			title: "Backups",
 			form: NewForm("Done",
@@ -32,7 +31,6 @@ func NewSettingsFormBackups(app *docker.Application, lastResult *docker.Operatio
 				FormItem{Label: "Backups", Field: autoBackField},
 			),
 		},
-		settings: app.Settings,
 	}
 
 	m.statusLine = func() string {
@@ -44,16 +42,23 @@ func NewSettingsFormBackups(app *docker.Application, lastResult *docker.Operatio
 			return "Backup complete", runBackup(app, pathField.Value())
 		}}
 	})
-	m.form.OnSubmit(func() tea.Cmd {
-		m.settings.Backup.Path = m.form.TextField(backupsPathField).Value()
-		m.settings.Backup.AutoBack = m.form.CheckboxField(backupsAutoBackField).Checked()
-		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: m.settings} }
+	m.form.OnSubmit(func(f *Form) tea.Cmd {
+		s := app.Settings
+		s.Backup.Path = f.TextField(backupsPathField).Value()
+		s.Backup.AutoBack = f.CheckboxField(backupsAutoBackField).Checked()
+		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: s} }
 	})
-	m.form.OnCancel(func() tea.Cmd {
+	m.form.OnCancel(func(f *Form) tea.Cmd {
 		return func() tea.Msg { return SettingsSectionCancelMsg{} }
 	})
 
 	return m
+}
+
+func (m SettingsFormBackups) Update(msg tea.Msg) (SettingsSection, tea.Cmd) {
+	var cmd tea.Cmd
+	m.settingsFormBase, cmd = m.update(msg)
+	return m, cmd
 }
 
 // Helpers

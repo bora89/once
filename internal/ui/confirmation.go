@@ -17,41 +17,41 @@ type Confirmation struct {
 	focused      int // 0 = confirm, 1 = cancel
 }
 
-func NewConfirmation(message, confirmLabel string) *Confirmation {
-	return &Confirmation{
+func NewConfirmation(message, confirmLabel string) Confirmation {
+	return Confirmation{
 		message:      message,
 		confirmLabel: confirmLabel,
 		focused:      1, // default to cancel for safety
 	}
 }
 
-func (m *Confirmation) Update(msg tea.Msg) tea.Cmd {
+func (m Confirmation) Update(msg tea.Msg) (Confirmation, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, NewKeyBinding("tab"), NewKeyBinding("shift+tab")):
 			m.focused = 1 - m.focused
 		case key.Matches(msg, NewKeyBinding("enter")):
-			return m.activate()
+			return m, m.activate()
 		case key.Matches(msg, NewKeyBinding("esc")):
-			return func() tea.Msg { return ConfirmationCancelMsg{} }
+			return m, func() tea.Msg { return ConfirmationCancelMsg{} }
 		}
 
 	case MouseEvent:
 		if msg.IsClick {
 			switch msg.Target {
 			case "confirm":
-				return func() tea.Msg { return ConfirmationConfirmMsg{} }
+				return m, func() tea.Msg { return ConfirmationConfirmMsg{} }
 			case "cancel":
-				return func() tea.Msg { return ConfirmationCancelMsg{} }
+				return m, func() tea.Msg { return ConfirmationCancelMsg{} }
 			}
 		}
 	}
 
-	return nil
+	return m, nil
 }
 
-func (m *Confirmation) View() string {
+func (m Confirmation) View() string {
 	messageView := lipgloss.NewStyle().Bold(true).Render(m.message)
 
 	confirmStyle := Styles.Button
@@ -77,7 +77,7 @@ func (m *Confirmation) View() string {
 
 // Private
 
-func (m *Confirmation) activate() tea.Cmd {
+func (m Confirmation) activate() tea.Cmd {
 	if m.focused == 0 {
 		return func() tea.Msg { return ConfirmationConfirmMsg{} }
 	}

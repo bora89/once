@@ -46,29 +46,30 @@ type InstallActivity struct {
 	stage         installStage
 	percentage    int
 	progressBar   progress.Model
-	progressBusy  *ProgressBusy
+	progressBusy  ProgressBusy
 	progressChan  chan installProgressMsg
 	doneChan      chan installDoneMsg
+	ctx           context.Context
 	cancel        context.CancelFunc
 }
 
 func NewInstallActivity(ns *docker.Namespace, imageRef, hostname string) *InstallActivity {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &InstallActivity{
 		namespace:    ns,
 		imageRef:     imageRef,
 		hostname:     hostname,
 		stage:        stagePreparing,
+		progressBusy: NewProgressBusy(0, nil),
 		progressChan: make(chan installProgressMsg, 10),
 		doneChan:     make(chan installDoneMsg, 1),
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 }
 
 func (m *InstallActivity) Init() tea.Cmd {
-	var busyInit tea.Cmd
-	if m.progressBusy != nil {
-		busyInit = m.progressBusy.Init()
-	}
-	return tea.Batch(busyInit, m.startInstall(), m.waitForProgress())
+	return tea.Batch(m.progressBusy.Init(), m.startInstall(), m.waitForProgress())
 }
 
 func (m *InstallActivity) Update(msg tea.Msg) tea.Cmd {
@@ -84,11 +85,7 @@ func (m *InstallActivity) Update(msg tea.Msg) tea.Cmd {
 		m.stage = msg.stage
 		m.percentage = msg.percentage
 		if msg.stage == stageStarting || msg.stage == stageVerifying {
-			var busyInit tea.Cmd
-			if m.progressBusy != nil {
-				busyInit = m.progressBusy.Init()
-			}
-			return tea.Batch(busyInit, m.waitForProgress())
+			return tea.Batch(m.progressBusy.Init(), m.waitForProgress())
 		}
 		return m.waitForProgress()
 
@@ -99,9 +96,9 @@ func (m *InstallActivity) Update(msg tea.Msg) tea.Cmd {
 		return func() tea.Msg { return InstallActivityDoneMsg{App: msg.app} }
 
 	case ProgressBusyTickMsg:
-		if m.progressBusy != nil {
-			return m.progressBusy.Update(msg)
-		}
+		var cmd tea.Cmd
+		m.progressBusy, cmd = m.progressBusy.Update(msg)
+		return cmd
 	}
 
 	return nil
@@ -125,9 +122,7 @@ func (m *InstallActivity) View() string {
 	var progressView string
 	switch m.stage {
 	case stagePreparing, stageStarting, stageVerifying:
-		if m.progressBusy != nil {
-			progressView = Styles.CenteredLine(m.width, m.progressBusy.View())
-		}
+		progressView = Styles.CenteredLine(m.width, m.progressBusy.View())
 	case stageDownloading:
 		progressView = Styles.CenteredLine(m.width, m.progressBar.ViewAs(float64(m.percentage)/100.0))
 	}
@@ -139,9 +134,7 @@ func (m *InstallActivity) View() string {
 
 func (m *InstallActivity) startInstall() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithCancel(context.Background())
-		m.cancel = cancel
-		go m.runInstall(ctx)
+		go m.runInstall(m.ctx)
 		return nil
 	}
 }

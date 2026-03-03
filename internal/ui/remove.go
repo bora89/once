@@ -24,28 +24,31 @@ type removeFinishedMsg struct {
 type Remove struct {
 	namespace     *docker.Namespace
 	app           *docker.Application
-	confirmation  *Confirmation
+	confirmation  Confirmation
 	width, height int
 	help          Help
 	removing      bool
-	progress      *ProgressBusy
+	progress      ProgressBusy
 	err           error
 }
 
-func NewRemove(ns *docker.Namespace, app *docker.Application) *Remove {
-	return &Remove{
+func NewRemove(ns *docker.Namespace, app *docker.Application) Remove {
+	h := NewHelp()
+	h.SetBindings([]key.Binding{removeKeys.Back})
+	return Remove{
 		namespace:    ns,
 		app:          app,
 		confirmation: NewConfirmation("Remove application and data?", "Remove"),
-		help:         NewHelp(),
+		help:         h,
+		progress:     NewProgressBusy(0, Colors.Border),
 	}
 }
 
-func (m *Remove) Init() tea.Cmd {
+func (m Remove) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Remove) Update(msg tea.Msg) tea.Cmd {
+func (m Remove) Update(msg tea.Msg) (Component, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -59,10 +62,13 @@ func (m *Remove) Update(msg tea.Msg) tea.Cmd {
 
 	case MouseEvent:
 		if !m.removing {
-			if cmd := m.help.Update(msg); cmd != nil {
-				return cmd
+			var cmd tea.Cmd
+			m.help, cmd = m.help.Update(msg)
+			if cmd != nil {
+				return m, cmd
 			}
-			return m.confirmation.Update(msg)
+			m.confirmation, cmd = m.confirmation.Update(msg)
+			return m, cmd
 		}
 
 	case tea.KeyPressMsg:
@@ -71,44 +77,46 @@ func (m *Remove) Update(msg tea.Msg) tea.Cmd {
 				m.err = nil
 			}
 			if key.Matches(msg, removeKeys.Back) {
-				return func() tea.Msg { return NavigateToDashboardMsg{AppName: m.app.Settings.Name} }
+				return m, func() tea.Msg { return NavigateToDashboardMsg{AppName: m.app.Settings.Name} }
 			}
-			return m.confirmation.Update(msg)
+			var cmd tea.Cmd
+			m.confirmation, cmd = m.confirmation.Update(msg)
+			return m, cmd
 		}
 
 	case ConfirmationConfirmMsg:
 		m.removing = true
 		m.progress = NewProgressBusy(m.width, Colors.Border)
-		return tea.Batch(m.progress.Init(), m.runRemove())
+		return m, tea.Batch(m.progress.Init(), m.runRemove())
 
 	case ConfirmationCancelMsg:
-		return func() tea.Msg { return NavigateToDashboardMsg{AppName: m.app.Settings.Name} }
+		return m, func() tea.Msg { return NavigateToDashboardMsg{AppName: m.app.Settings.Name} }
 
 	case removeFinishedMsg:
 		if msg.err != nil {
 			m.err = msg.err
 			m.removing = false
-			return nil
+			return m, nil
 		}
-		return func() tea.Msg { return NavigateToDashboardMsg{AllowEmpty: true} }
+		return m, func() tea.Msg { return NavigateToDashboardMsg{AllowEmpty: true} }
 
 	case ProgressBusyTickMsg:
-		if m.removing && m.progress != nil {
-			cmds = append(cmds, m.progress.Update(msg))
+		if m.removing {
+			var cmd tea.Cmd
+			m.progress, cmd = m.progress.Update(msg)
+			cmds = append(cmds, cmd)
 		}
 	}
 
-	return tea.Batch(cmds...)
+	return m, tea.Batch(cmds...)
 }
 
-func (m *Remove) View() string {
+func (m Remove) View() string {
 	titleLine := Styles.TitleRule(m.width, m.app.Settings.Host, "remove")
 
 	var contentView string
 	if m.removing {
-		if m.progress != nil {
-			contentView = m.progress.View()
-		}
+		contentView = m.progress.View()
 	} else {
 		var errorLine string
 		if m.err != nil {
@@ -119,8 +127,7 @@ func (m *Remove) View() string {
 
 	var helpLine string
 	if !m.removing {
-		helpView := m.help.View([]key.Binding{removeKeys.Back})
-		helpLine = Styles.CenteredLine(m.width, helpView)
+		helpLine = Styles.CenteredLine(m.width, m.help.View())
 	}
 
 	titleHeight := 2 // title + blank line
@@ -140,7 +147,7 @@ func (m *Remove) View() string {
 
 // Private
 
-func (m *Remove) runRemove() tea.Cmd {
+func (m Remove) runRemove() tea.Cmd {
 	return func() tea.Msg {
 		err := m.app.Remove(context.Background(), true)
 		return removeFinishedMsg{appName: m.app.Settings.Name, err: err}

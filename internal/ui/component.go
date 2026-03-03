@@ -8,7 +8,7 @@ import (
 // tea.Model; sub-components use this narrower interface with plain string views.
 type Component interface {
 	Init() tea.Cmd
-	Update(tea.Msg) tea.Cmd
+	Update(tea.Msg) (Component, tea.Cmd)
 	View() string
 }
 

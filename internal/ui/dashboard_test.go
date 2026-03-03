@@ -53,24 +53,24 @@ func TestDashboardKeyboardSelectsPanel(t *testing.T) {
 
 	assert.Equal(t, 0, d.selectedIndex)
 
-	d.Update(keyPressMsg("down"))
+	d, _ = updateDashboard(d, keyPressMsg("down"))
 	assert.Equal(t, 1, d.selectedIndex)
 
-	d.Update(keyPressMsg("down"))
+	d, _ = updateDashboard(d, keyPressMsg("down"))
 	assert.Equal(t, 2, d.selectedIndex)
 
 	// Can't go past last
-	d.Update(keyPressMsg("down"))
+	d, _ = updateDashboard(d, keyPressMsg("down"))
 	assert.Equal(t, 2, d.selectedIndex)
 
-	d.Update(keyPressMsg("up"))
+	d, _ = updateDashboard(d, keyPressMsg("up"))
 	assert.Equal(t, 1, d.selectedIndex)
 
-	d.Update(keyPressMsg("up"))
+	d, _ = updateDashboard(d, keyPressMsg("up"))
 	assert.Equal(t, 0, d.selectedIndex)
 
 	// Can't go before first
-	d.Update(keyPressMsg("up"))
+	d, _ = updateDashboard(d, keyPressMsg("up"))
 	assert.Equal(t, 0, d.selectedIndex)
 }
 
@@ -81,10 +81,10 @@ func TestDashboardKeyboardJK(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	d.Update(runeKeyMsg('j'))
+	d, _ = updateDashboard(d, runeKeyMsg('j'))
 	assert.Equal(t, 1, d.selectedIndex)
 
-	d.Update(runeKeyMsg('k'))
+	d, _ = updateDashboard(d, runeKeyMsg('k'))
 	assert.Equal(t, 0, d.selectedIndex)
 }
 
@@ -95,7 +95,7 @@ func TestDashboard_ActionsMenuOpensOnA(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	d.Update(runeKeyMsg('a'))
+	d, _ = updateDashboard(d, runeKeyMsg('a'))
 	assert.NotNil(t, d.overlay)
 }
 
@@ -106,10 +106,10 @@ func TestDashboard_ActionsMenuCloses(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	d.Update(runeKeyMsg('a'))
+	d, _ = updateDashboard(d, runeKeyMsg('a'))
 	assert.NotNil(t, d.overlay)
 
-	d.Update(ActionsMenuCloseMsg{})
+	d, _ = updateDashboard(d, ActionsMenuCloseMsg{})
 	assert.Nil(t, d.overlay)
 }
 
@@ -120,7 +120,7 @@ func TestDashboard_ActionsMenuStartStop(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	d.Update(ActionsMenuSelectMsg{app: d.apps[0], action: ActionsMenuStartStop})
+	d, _ = updateDashboard(d, ActionsMenuSelectMsg{app: d.apps[0], action: ActionsMenuStartStop})
 	assert.True(t, d.toggling)
 }
 
@@ -131,7 +131,7 @@ func TestDashboard_ActionsMenuRemove(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	cmd := d.Update(ActionsMenuSelectMsg{app: d.apps[0], action: ActionsMenuRemove})
+	_, cmd := updateDashboard(d, ActionsMenuSelectMsg{app: d.apps[0], action: ActionsMenuRemove})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -147,7 +147,7 @@ func TestDashboard_OldStartStopKeyRemoved(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	d.Update(runeKeyMsg('o'))
+	d, _ = updateDashboard(d, runeKeyMsg('o'))
 	assert.False(t, d.toggling)
 }
 
@@ -158,13 +158,13 @@ func TestDashboard_SettingsMenuStillWorks(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	d.Update(runeKeyMsg('s'))
+	d, _ = updateDashboard(d, runeKeyMsg('s'))
 	assert.NotNil(t, d.overlay)
 }
 
 func TestDashboard_EmptyStateShowsMessage(t *testing.T) {
 	d := testDashboard(0)
-	d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	d, _ = updateDashboard(d, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	view := d.View()
 	assert.Contains(t, view, "There are no applications installed")
@@ -173,7 +173,7 @@ func TestDashboard_EmptyStateShowsMessage(t *testing.T) {
 
 // Helpers
 
-func testDashboard(numApps int) *Dashboard {
+func testDashboard(numApps int) Dashboard {
 	apps := make([]*docker.Application, numApps)
 	for i := range numApps {
 		apps[i] = &docker.Application{
@@ -189,4 +189,9 @@ func testDashboard(numApps int) *Dashboard {
 	dockerScraper := &docker.Scraper{}
 
 	return NewDashboard(nil, apps, 0, scraper, dockerScraper)
+}
+
+func updateDashboard(d Dashboard, msg tea.Msg) (Dashboard, tea.Cmd) {
+	comp, cmd := d.Update(msg)
+	return comp.(Dashboard), cmd
 }

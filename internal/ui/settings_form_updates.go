@@ -12,20 +12,18 @@ const updatesAutoUpdateField = 0
 
 type SettingsFormUpdates struct {
 	settingsFormBase
-	settings docker.ApplicationSettings
 }
 
-func NewSettingsFormUpdates(app *docker.Application, lastResult *docker.OperationResult) *SettingsFormUpdates {
+func NewSettingsFormUpdates(app *docker.Application, lastResult *docker.OperationResult) SettingsFormUpdates {
 	autoUpdateField := NewCheckboxField("Automatically apply updates", app.Settings.AutoUpdate)
 
-	m := &SettingsFormUpdates{
+	m := SettingsFormUpdates{
 		settingsFormBase: settingsFormBase{
 			title: "Updates",
 			form: NewForm("Done",
 				FormItem{Label: "Updates", Field: autoUpdateField},
 			),
 		},
-		settings: app.Settings,
 	}
 
 	m.statusLine = func() string {
@@ -44,13 +42,20 @@ func NewSettingsFormUpdates(app *docker.Application, lastResult *docker.Operatio
 			return "Update complete", nil
 		}}
 	})
-	m.form.OnSubmit(func() tea.Cmd {
-		m.settings.AutoUpdate = m.form.CheckboxField(updatesAutoUpdateField).Checked()
-		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: m.settings} }
+	m.form.OnSubmit(func(f *Form) tea.Cmd {
+		s := app.Settings
+		s.AutoUpdate = f.CheckboxField(updatesAutoUpdateField).Checked()
+		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: s} }
 	})
-	m.form.OnCancel(func() tea.Cmd {
+	m.form.OnCancel(func(f *Form) tea.Cmd {
 		return func() tea.Msg { return SettingsSectionCancelMsg{} }
 	})
 
 	return m
+}
+
+func (m SettingsFormUpdates) Update(msg tea.Msg) (SettingsSection, tea.Cmd) {
+	var cmd tea.Cmd
+	m.settingsFormBase, cmd = m.update(msg)
+	return m, cmd
 }

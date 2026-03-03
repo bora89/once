@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 	"github.com/basecamp/once/internal/docker"
 )
 
-func newTestLogs() *Logs {
+func newTestLogs() Logs {
 	vp := viewport.New()
 	vp.MouseWheelEnabled = false
 	vp.KeyMap = viewport.KeyMap{}
@@ -22,7 +23,7 @@ func newTestLogs() *Logs {
 	fi.Placeholder = "Filter logs"
 	fi.CharLimit = 256
 
-	return &Logs{
+	return Logs{
 		app: &docker.Application{
 			Settings: docker.ApplicationSettings{Name: "testapp"},
 		},
@@ -42,7 +43,7 @@ func TestLogsFilterActivation(t *testing.T) {
 	m := newTestLogs()
 	m.filterActive = false
 
-	m.Update(runeKeyMsg('/'))
+	m, _ = updateLogs(m, runeKeyMsg('/'))
 
 	assert.True(t, m.filterActive)
 }
@@ -52,7 +53,7 @@ func TestLogsFilterAppliesOnKeypress(t *testing.T) {
 	m.filterActive = true
 	m.filterInput.SetValue("err")
 
-	m.Update(runeKeyMsg('o'))
+	m, _ = updateLogs(m, runeKeyMsg('o'))
 
 	assert.Equal(t, m.filterInput.Value(), m.filterText)
 }
@@ -63,7 +64,7 @@ func TestLogsFilterClearedOnEscape(t *testing.T) {
 	m.filterText = "error"
 	m.filterInput.SetValue("error")
 
-	m.Update(keyPressMsg("esc"))
+	m, _ = updateLogs(m, keyPressMsg("esc"))
 
 	assert.False(t, m.filterActive)
 	assert.Equal(t, "", m.filterText)
@@ -74,7 +75,7 @@ func TestLogsBackNavigation(t *testing.T) {
 	m := newTestLogs()
 	m.filterActive = false
 
-	cmd := m.Update(keyPressMsg("esc"))
+	_, cmd := updateLogs(m, keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -102,4 +103,11 @@ func TestLogsFilterMatchesCaseInsensitive(t *testing.T) {
 	assert.Len(t, filtered, 2)
 	assert.Equal(t, "This is an error message", filtered[0])
 	assert.Equal(t, "Another ERROR here", filtered[1])
+}
+
+// Helpers
+
+func updateLogs(m Logs, msg tea.Msg) (Logs, tea.Cmd) {
+	comp, cmd := m.Update(msg)
+	return comp.(Logs), cmd
 }

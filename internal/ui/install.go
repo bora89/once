@@ -29,7 +29,7 @@ type Install struct {
 	width, height int
 	help          Help
 	state         installState
-	form          *InstallForm
+	form          InstallForm
 	activity      *InstallActivity
 	starfield     *Starfield
 	logo          *Logo
@@ -37,10 +37,12 @@ type Install struct {
 	cliMode       bool
 }
 
-func NewInstall(ns *docker.Namespace, imageRef string) *Install {
-	m := &Install{
+func NewInstall(ns *docker.Namespace, imageRef string) Install {
+	h := NewHelp()
+	h.SetBindings([]key.Binding{installKeys.Back})
+	m := Install{
 		namespace: ns,
-		help:      NewHelp(),
+		help:      h,
 		state:     installStateForm,
 		form:      NewInstallForm(imageRef),
 		cliMode:   imageRef != "",
@@ -52,7 +54,7 @@ func NewInstall(ns *docker.Namespace, imageRef string) *Install {
 	return m
 }
 
-func (m *Install) Init() tea.Cmd {
+func (m Install) Init() tea.Cmd {
 	cmds := []tea.Cmd{m.form.Init()}
 	if m.showLogo() {
 		cmds = append(cmds, m.starfield.Init(), m.logo.Init())
@@ -60,7 +62,7 @@ func (m *Install) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m *Install) Update(msg tea.Msg) tea.Cmd {
+func (m Install) Update(msg tea.Msg) (Component, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -70,28 +72,32 @@ func (m *Install) Update(msg tea.Msg) tea.Cmd {
 			cmds = append(cmds, m.starfield.Update(tea.WindowSizeMsg{Width: m.width, Height: m.middleHeight()}))
 		}
 		if m.state == installStateForm {
-			cmds = append(cmds, m.form.Update(msg))
+			var cmd tea.Cmd
+			m.form, cmd = m.form.Update(msg)
+			cmds = append(cmds, cmd)
 		} else {
 			cmds = append(cmds, m.activity.Update(msg))
 		}
-		return tea.Batch(cmds...)
+		return m, tea.Batch(cmds...)
 
 	case starfieldTickMsg:
 		if m.starfield != nil {
-			return m.starfield.Update(msg)
+			return m, m.starfield.Update(msg)
 		}
-		return nil
+		return m, nil
 
 	case logoShineStartMsg, logoShineStepMsg:
 		if m.showLogo() && m.state == installStateForm {
-			return m.logo.Update(msg)
+			return m, m.logo.Update(msg)
 		}
-		return nil
+		return m, nil
 
 	case MouseEvent:
 		if m.state == installStateForm {
-			if cmd := m.help.Update(msg); cmd != nil {
-				return cmd
+			var cmd tea.Cmd
+			m.help, cmd = m.help.Update(msg)
+			if cmd != nil {
+				return m, cmd
 			}
 		}
 
@@ -101,42 +107,41 @@ func (m *Install) Update(msg tea.Msg) tea.Cmd {
 				m.err = nil
 			}
 			if key.Matches(msg, installKeys.Back) {
-				return m.cancelFromScreen()
+				return m, m.cancelFromScreen()
 			}
 		}
 
 	case InstallFormCancelMsg:
-		return m.cancelFromScreen()
+		return m, m.cancelFromScreen()
 
 	case InstallFormSubmitMsg:
 		m.state = installStateActivity
 		m.activity = NewInstallActivity(m.namespace, msg.ImageRef, msg.Hostname)
-		sizeCmd := m.activity.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		return tea.Batch(sizeCmd, m.activity.Init())
+		m.activity.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return m, m.activity.Init()
 
 	case InstallActivityFailedMsg:
 		m.state = installStateForm
 		m.activity = nil
 		m.err = msg.Err
 		if m.showLogo() {
-			return m.logo.Init()
+			return m, m.logo.Init()
 		}
-		return nil
+		return m, nil
 
 	case InstallActivityDoneMsg:
-		return func() tea.Msg { return NavigateToAppMsg(msg) }
+		return m, func() tea.Msg { return NavigateToAppMsg(msg) }
 	}
 
-	var cmd tea.Cmd
 	if m.state == installStateForm {
-		cmd = m.form.Update(msg)
-	} else {
-		cmd = m.activity.Update(msg)
+		var cmd tea.Cmd
+		m.form, cmd = m.form.Update(msg)
+		return m, cmd
 	}
-	return cmd
+	return m, m.activity.Update(msg)
 }
 
-func (m *Install) View() string {
+func (m Install) View() string {
 	var contentView string
 	if m.state == installStateForm {
 		formView := m.form.View()
@@ -155,8 +160,7 @@ func (m *Install) View() string {
 
 	var helpLine string
 	if m.state == installStateForm {
-		helpView := m.help.View([]key.Binding{installKeys.Back})
-		helpLine = Styles.CenteredLine(m.width, helpView)
+		helpLine = Styles.CenteredLine(m.width, m.help.View())
 	}
 
 	if m.starfield != nil {
@@ -171,11 +175,11 @@ func (m *Install) View() string {
 
 // Private
 
-func (m *Install) showLogo() bool {
+func (m Install) showLogo() bool {
 	return m.namespace == nil || len(m.namespace.Applications()) == 0
 }
 
-func (m *Install) middleHeight() int {
+func (m Install) middleHeight() int {
 	helpHeight := 1 // help line when in form state
 	if m.starfield != nil {
 		return max(m.height-helpHeight, 0)
@@ -184,7 +188,7 @@ func (m *Install) middleHeight() int {
 	return max(m.height-titleHeight-helpHeight, 0)
 }
 
-func (m *Install) cancelFromScreen() tea.Cmd {
+func (m Install) cancelFromScreen() tea.Cmd {
 	if m.activity != nil {
 		m.activity.Cancel()
 	}
@@ -194,7 +198,7 @@ func (m *Install) cancelFromScreen() tea.Cmd {
 	return func() tea.Msg { return NavigateToDashboardMsg{} }
 }
 
-func (m *Install) renderMiddleCentered(contentView string, middleHeight int) string {
+func (m Install) renderMiddleCentered(contentView string, middleHeight int) string {
 	centered := lipgloss.NewStyle().
 		Width(m.width).
 		Height(middleHeight).
@@ -204,7 +208,7 @@ func (m *Install) renderMiddleCentered(contentView string, middleHeight int) str
 }
 
 // renderMiddleWithStarfield composites the content view over the starfield background.
-func (m *Install) renderMiddleWithStarfield(contentView string, middleHeight int) string {
+func (m Install) renderMiddleWithStarfield(contentView string, middleHeight int) string {
 	m.starfield.ComputeGrid()
 
 	fgLines := strings.Split(contentView, "\n")

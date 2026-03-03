@@ -16,7 +16,8 @@ func TestHelp_RenderBasic(t *testing.T) {
 
 	h := NewHelp()
 	h.SetWidth(80)
-	result := h.View(bindings)
+	h.SetBindings(bindings)
+	result := h.View()
 
 	assert.Contains(t, result, "s")
 	assert.Contains(t, result, "settings")
@@ -28,7 +29,7 @@ func TestHelp_RenderEmpty(t *testing.T) {
 	h := NewHelp()
 	h.SetWidth(80)
 
-	result := h.View(nil)
+	result := h.View()
 	assert.Empty(t, result)
 }
 
@@ -41,7 +42,8 @@ func TestHelp_RenderSkipsEmptyHelp(t *testing.T) {
 
 	h := NewHelp()
 	h.SetWidth(80)
-	result := h.View(bindings)
+	h.SetBindings(bindings)
+	result := h.View()
 
 	assert.Contains(t, result, "settings")
 	assert.Contains(t, result, "logs")
@@ -58,7 +60,8 @@ func TestHelp_RenderWraps(t *testing.T) {
 
 	h := NewHelp()
 	h.SetWidth(30) // narrow enough to force wrapping
-	result := h.View(bindings)
+	h.SetBindings(bindings)
+	result := h.View()
 
 	lines := strings.Split(result, "\n")
 	assert.Greater(t, len(lines), 1, "should wrap to multiple lines")

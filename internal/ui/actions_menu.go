@@ -36,40 +36,46 @@ func NewActionsMenu(app *docker.Application) ActionsMenu {
 		startStopLabel = "Stop"
 	}
 
+	h := NewHelp()
+	h.SetBindings([]key.Binding{actionsMenuCloseKey})
 	return ActionsMenu{
 		app: app,
 		menu: NewMenu(
 			MenuItem{Label: startStopLabel, Key: int(ActionsMenuStartStop), Shortcut: WithHelp(NewKeyBinding("s"), "s", "")},
 			MenuItem{Label: "Remove", Key: int(ActionsMenuRemove), Shortcut: WithHelp(NewKeyBinding("r"), "r", "")},
 		),
-		help: NewHelp(),
+		help: h,
 	}
 }
 
-func (m *ActionsMenu) Init() tea.Cmd {
+func (m ActionsMenu) Init() tea.Cmd {
 	return nil
 }
 
-func (m *ActionsMenu) Update(msg tea.Msg) tea.Cmd {
+func (m ActionsMenu) Update(msg tea.Msg) (Component, tea.Cmd) {
 	switch msg := msg.(type) {
 	case MouseEvent:
-		if cmd := m.help.Update(msg); cmd != nil {
-			return cmd
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
 
 	case tea.KeyPressMsg:
 		if key.Matches(msg, actionsMenuCloseKey) {
-			return func() tea.Msg { return ActionsMenuCloseMsg{} }
+			return m, func() tea.Msg { return ActionsMenuCloseMsg{} }
 		}
 
 	case MenuSelectMsg:
-		return m.selectAction(ActionsMenuAction(msg.Key))
+		return m, m.selectAction(ActionsMenuAction(msg.Key))
 	}
 
-	return m.menu.Update(msg)
+	var cmd tea.Cmd
+	m.menu, cmd = m.menu.Update(msg)
+	return m, cmd
 }
 
-func (m *ActionsMenu) View() string {
+func (m ActionsMenu) View() string {
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(Colors.Border).
@@ -84,7 +90,7 @@ func (m *ActionsMenu) View() string {
 
 	menuView := m.menu.View()
 
-	helpView := m.help.View([]key.Binding{actionsMenuCloseKey})
+	helpView := m.help.View()
 	menuWidth := lipgloss.Width(menuView)
 	helpLine := lipgloss.NewStyle().MarginTop(1).Width(menuWidth).Align(lipgloss.Center).Render(helpView)
 
@@ -99,7 +105,7 @@ func (m *ActionsMenu) View() string {
 
 // Private
 
-func (m *ActionsMenu) selectAction(action ActionsMenuAction) tea.Cmd {
+func (m ActionsMenu) selectAction(action ActionsMenuAction) tea.Cmd {
 	return func() tea.Msg {
 		return ActionsMenuSelectMsg{app: m.app, action: action}
 	}

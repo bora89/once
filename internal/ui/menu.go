@@ -36,17 +36,22 @@ type Menu struct {
 }
 
 func NewMenu(items ...MenuItem) Menu {
-	m := Menu{
-		items: items,
+	maxLen := 0
+	for _, item := range items {
+		if w := lipgloss.Width(item.Label); w > maxLen {
+			maxLen = w
+		}
 	}
-	m.measureItems()
-	return m
+	return Menu{
+		items:    items,
+		padWidth: maxLen + 2,
+	}
 }
 
-func (m *Menu) Update(msg tea.Msg) tea.Cmd {
+func (m Menu) Update(msg tea.Msg) (Menu, tea.Cmd) {
 	count := len(m.items)
 	if count == 0 {
-		return nil
+		return m, nil
 	}
 
 	switch msg := msg.(type) {
@@ -55,7 +60,7 @@ func (m *Menu) Update(msg tea.Msg) tea.Cmd {
 			for i, item := range m.items {
 				if msg.Target == menuItemTarget(i) {
 					m.selected = i
-					return m.selectItem(item.Key)
+					return m, m.selectItem(item.Key)
 				}
 			}
 		}
@@ -67,21 +72,21 @@ func (m *Menu) Update(msg tea.Msg) tea.Cmd {
 		case key.Matches(msg, menuKeys.Down):
 			m.selected = (m.selected + 1) % count
 		case key.Matches(msg, menuKeys.Select):
-			return m.selectItem(m.items[m.selected].Key)
+			return m, m.selectItem(m.items[m.selected].Key)
 		default:
 			for i, item := range m.items {
 				if key.Matches(msg, item.Shortcut) {
 					m.selected = i
-					return m.selectItem(item.Key)
+					return m, m.selectItem(item.Key)
 				}
 			}
 		}
 	}
 
-	return nil
+	return m, nil
 }
 
-func (m *Menu) View() string {
+func (m Menu) View() string {
 	itemStyle := lipgloss.NewStyle()
 	selectedStyle := lipgloss.NewStyle().Reverse(true)
 	keyStyle := lipgloss.NewStyle().Foreground(Colors.Border)
@@ -106,17 +111,7 @@ func (m *Menu) View() string {
 
 // Private
 
-func (m *Menu) measureItems() {
-	maxLen := 0
-	for _, item := range m.items {
-		if w := lipgloss.Width(item.Label); w > maxLen {
-			maxLen = w
-		}
-	}
-	m.padWidth = maxLen + 2
-}
-
-func (m *Menu) selectItem(key int) tea.Cmd {
+func (m Menu) selectItem(key int) tea.Cmd {
 	return func() tea.Msg { return MenuSelectMsg{Key: key} }
 }
 

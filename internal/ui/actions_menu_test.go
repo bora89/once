@@ -3,6 +3,8 @@ package ui
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/basecamp/once/internal/docker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,12 +29,12 @@ func TestActionsMenu_SelectStartStop(t *testing.T) {
 	m := NewActionsMenu(app)
 
 	// Shortcut key goes to menu, which returns MenuSelectMsg
-	cmd := m.Update(runeKeyMsg('s'))
+	m, cmd := updateActionsMenu(m, runeKeyMsg('s'))
 	require.NotNil(t, cmd)
 	msg := cmd()
 
 	// Feed MenuSelectMsg back to get ActionsMenuSelectMsg
-	cmd = m.Update(msg)
+	_, cmd = updateActionsMenu(m, msg)
 	require.NotNil(t, cmd)
 	msg = cmd()
 
@@ -46,11 +48,11 @@ func TestActionsMenu_SelectRemove(t *testing.T) {
 	app := &docker.Application{}
 	m := NewActionsMenu(app)
 
-	cmd := m.Update(runeKeyMsg('r'))
+	m, cmd := updateActionsMenu(m, runeKeyMsg('r'))
 	require.NotNil(t, cmd)
 	msg := cmd()
 
-	cmd = m.Update(msg)
+	_, cmd = updateActionsMenu(m, msg)
 	require.NotNil(t, cmd)
 	msg = cmd()
 
@@ -63,7 +65,7 @@ func TestActionsMenu_EscCloses(t *testing.T) {
 	app := &docker.Application{}
 	m := NewActionsMenu(app)
 
-	cmd := m.Update(keyPressMsg("esc"))
+	_, cmd := updateActionsMenu(m, keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -76,24 +78,31 @@ func TestActionsMenu_KeyboardNavigation(t *testing.T) {
 	m := NewActionsMenu(app)
 
 	// Navigate down to Remove
-	m.Update(runeKeyMsg('j'))
+	m, _ = updateActionsMenu(m, runeKeyMsg('j'))
 	assert.Equal(t, 1, m.menu.selected)
 
 	// Navigate back up to Start/Stop
-	m.Update(runeKeyMsg('k'))
+	m, _ = updateActionsMenu(m, runeKeyMsg('k'))
 	assert.Equal(t, 0, m.menu.selected)
 
 	// Navigate down and select with enter
-	m.Update(runeKeyMsg('j'))
-	cmd := m.Update(keyPressMsg("enter"))
+	m, _ = updateActionsMenu(m, runeKeyMsg('j'))
+	m, cmd := updateActionsMenu(m, keyPressMsg("enter"))
 	require.NotNil(t, cmd)
 	msg := cmd()
 
-	cmd = m.Update(msg)
+	_, cmd = updateActionsMenu(m, msg)
 	require.NotNil(t, cmd)
 	msg = cmd()
 
 	selectMsg, ok := msg.(ActionsMenuSelectMsg)
 	require.True(t, ok, "expected ActionsMenuSelectMsg, got %T", msg)
 	assert.Equal(t, ActionsMenuRemove, selectMsg.action)
+}
+
+// Helpers
+
+func updateActionsMenu(m ActionsMenu, msg tea.Msg) (ActionsMenu, tea.Cmd) {
+	comp, cmd := m.Update(msg)
+	return comp.(ActionsMenu), cmd
 }

@@ -20,12 +20,12 @@ type InstallFormSubmitMsg struct {
 type InstallFormCancelMsg struct{}
 
 type InstallForm struct {
-	form        *Form
+	form        Form
 	lastAppName string
 	imageRef    string
 }
 
-func NewInstallForm(imageRef string) *InstallForm {
+func NewInstallForm(imageRef string) InstallForm {
 	var formItems []FormItem
 
 	if imageRef != "" {
@@ -61,20 +61,26 @@ func NewInstallForm(imageRef string) *InstallForm {
 		Required: true,
 	})
 
-	m := &InstallForm{
+	m := InstallForm{
 		form:     NewForm("Install", formItems...),
 		imageRef: imageRef,
 	}
 
-	m.form.OnSubmit(func() tea.Cmd {
+	m.form.OnSubmit(func(f *Form) tea.Cmd {
+		var ref string
+		if imageRef != "" {
+			ref = imageRef
+		} else {
+			ref = f.TextField(installImageRefField).Value()
+		}
 		return func() tea.Msg {
 			return InstallFormSubmitMsg{
-				ImageRef: m.ImageRef(),
-				Hostname: m.form.TextField(installHostnameField).Value(),
+				ImageRef: ref,
+				Hostname: f.TextField(installHostnameField).Value(),
 			}
 		}
 	})
-	m.form.OnCancel(func() tea.Cmd {
+	m.form.OnCancel(func(f *Form) tea.Cmd {
 		return func() tea.Msg { return InstallFormCancelMsg{} }
 	})
 
@@ -85,35 +91,36 @@ func NewInstallForm(imageRef string) *InstallForm {
 	return m
 }
 
-func (m *InstallForm) Init() tea.Cmd {
+func (m InstallForm) Init() tea.Cmd {
 	return m.form.Init()
 }
 
-func (m *InstallForm) Update(msg tea.Msg) tea.Cmd {
+func (m InstallForm) Update(msg tea.Msg) (InstallForm, tea.Cmd) {
 	prev := m.form.Focused()
 
-	cmd := m.form.Update(msg)
+	var cmd tea.Cmd
+	m.form, cmd = m.form.Update(msg)
 
 	if prev == 0 && m.form.Focused() != 0 && m.imageRef == "" {
 		m.expandImageAlias()
 		m.updateHostnamePlaceholder()
 	}
 
-	return cmd
+	return m, cmd
 }
 
-func (m *InstallForm) View() string {
+func (m InstallForm) View() string {
 	return m.form.View()
 }
 
-func (m *InstallForm) ImageRef() string {
+func (m InstallForm) ImageRef() string {
 	if m.imageRef != "" {
 		return m.imageRef
 	}
 	return m.form.TextField(installImageRefField).Value()
 }
 
-func (m *InstallForm) Hostname() string {
+func (m InstallForm) Hostname() string {
 	return m.form.TextField(installHostnameField).Value()
 }
 

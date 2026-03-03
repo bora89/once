@@ -16,27 +16,27 @@ func TestConfirmation_TabCyclesFocus(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
 	assert.Equal(t, 1, c.focused)
 
-	c.Update(keyPressMsg("tab"))
+	c, _ = c.Update(keyPressMsg("tab"))
 	assert.Equal(t, 0, c.focused)
 
-	c.Update(keyPressMsg("tab"))
+	c, _ = c.Update(keyPressMsg("tab"))
 	assert.Equal(t, 1, c.focused)
 }
 
 func TestConfirmation_ShiftTabCyclesFocus(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
 
-	c.Update(keyPressMsg("shift+tab"))
+	c, _ = c.Update(keyPressMsg("shift+tab"))
 	assert.Equal(t, 0, c.focused)
 
-	c.Update(keyPressMsg("shift+tab"))
+	c, _ = c.Update(keyPressMsg("shift+tab"))
 	assert.Equal(t, 1, c.focused)
 }
 
 func TestConfirmation_EnterOnCancelEmitsCancel(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
 
-	cmd := c.Update(keyPressMsg("enter"))
+	_, cmd := c.Update(keyPressMsg("enter"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -46,9 +46,9 @@ func TestConfirmation_EnterOnCancelEmitsCancel(t *testing.T) {
 
 func TestConfirmation_EnterOnConfirmEmitsConfirm(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
-	c.Update(keyPressMsg("tab")) // focus confirm
+	c, _ = c.Update(keyPressMsg("tab")) // focus confirm
 
-	cmd := c.Update(keyPressMsg("enter"))
+	_, cmd := c.Update(keyPressMsg("enter"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -59,7 +59,7 @@ func TestConfirmation_EnterOnConfirmEmitsConfirm(t *testing.T) {
 func TestConfirmation_EscEmitsCancel(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
 
-	cmd := c.Update(keyPressMsg("esc"))
+	_, cmd := c.Update(keyPressMsg("esc"))
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -79,7 +79,7 @@ func TestConfirmation_ViewShowsMessageAndButtons(t *testing.T) {
 func TestConfirmation_ClickConfirm(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
 
-	cmd := c.Update(MouseEvent{IsClick: true, Target: "confirm"})
+	_, cmd := c.Update(MouseEvent{IsClick: true, Target: "confirm"})
 	require.NotNil(t, cmd)
 
 	msg := cmd()
@@ -90,7 +90,7 @@ func TestConfirmation_ClickConfirm(t *testing.T) {
 func TestConfirmation_ClickCancel(t *testing.T) {
 	c := NewConfirmation("Delete?", "Delete")
 
-	cmd := c.Update(MouseEvent{IsClick: true, Target: "cancel"})
+	_, cmd := c.Update(MouseEvent{IsClick: true, Target: "cancel"})
 	require.NotNil(t, cmd)
 
 	msg := cmd()

@@ -18,32 +18,29 @@ type ProgressBusy struct {
 
 type ProgressBusyTickMsg struct{}
 
-func NewProgressBusy(width int, clr color.Color) *ProgressBusy {
-	return &ProgressBusy{
+func NewProgressBusy(width int, clr color.Color) ProgressBusy {
+	return ProgressBusy{
 		width:   width,
 		color:   clr,
 		pattern: generateBraillePattern(width),
 	}
 }
 
-func (p *ProgressBusy) Init() tea.Cmd {
-	if p == nil {
-		return nil
-	}
+func (p ProgressBusy) Init() tea.Cmd {
 	return p.tick()
 }
 
-func (p *ProgressBusy) Update(msg tea.Msg) tea.Cmd {
+func (p ProgressBusy) Update(msg tea.Msg) (ProgressBusy, tea.Cmd) {
 	switch msg.(type) {
 	case ProgressBusyTickMsg:
 		p.pattern = generateBraillePattern(p.width)
-		return p.tick()
+		return p, p.tick()
 	}
-	return nil
+	return p, nil
 }
 
-func (p *ProgressBusy) View() string {
-	if p == nil || p.width <= 0 {
+func (p ProgressBusy) View() string {
+	if p.width <= 0 {
 		return ""
 	}
 
@@ -52,7 +49,7 @@ func (p *ProgressBusy) View() string {
 
 // Private
 
-func (p *ProgressBusy) tick() tea.Cmd {
+func (p ProgressBusy) tick() tea.Cmd {
 	return tea.Tick(50*time.Millisecond, func(time.Time) tea.Msg {
 		return ProgressBusyTickMsg{}
 	})

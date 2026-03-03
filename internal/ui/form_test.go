@@ -14,16 +14,16 @@ func TestForm_FocusCycling(t *testing.T) {
 	)
 	assert.Equal(t, 0, form.Focused())
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 1, form.Focused())
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 2, form.Focused(), "submit button")
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 3, form.Focused(), "cancel button")
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 0, form.Focused(), "wraps to first field")
 }
 
@@ -33,16 +33,16 @@ func TestForm_ShiftTabCycling(t *testing.T) {
 		FormItem{Label: "Second", Field: NewTextField("second")},
 	)
 
-	formPressShiftTab(form)
+	formPressShiftTab(&form)
 	assert.Equal(t, 3, form.Focused(), "cancel button")
 
-	formPressShiftTab(form)
+	formPressShiftTab(&form)
 	assert.Equal(t, 2, form.Focused(), "submit button")
 
-	formPressShiftTab(form)
+	formPressShiftTab(&form)
 	assert.Equal(t, 1, form.Focused())
 
-	formPressShiftTab(form)
+	formPressShiftTab(&form)
 	assert.Equal(t, 0, form.Focused())
 }
 
@@ -52,10 +52,10 @@ func TestForm_EnterAdvancesFocus(t *testing.T) {
 		FormItem{Label: "Second", Field: NewTextField("second")},
 	)
 
-	formPressEnter(form)
+	formPressEnter(&form)
 	assert.Equal(t, 1, form.Focused())
 
-	formPressEnter(form)
+	formPressEnter(&form)
 	assert.Equal(t, 2, form.Focused(), "submit button")
 }
 
@@ -64,15 +64,15 @@ func TestForm_SubmitAction(t *testing.T) {
 		FormItem{Label: "Field", Field: NewTextField("val")},
 	)
 	submitted := false
-	form.OnSubmit(func() tea.Cmd {
+	form.OnSubmit(func(f *Form) tea.Cmd {
 		submitted = true
 		return nil
 	})
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 1, form.Focused(), "submit button")
 
-	form.Update(keyPressMsg("enter"))
+	form, _ = form.Update(keyPressMsg("enter"))
 	assert.True(t, submitted)
 }
 
@@ -81,16 +81,16 @@ func TestForm_CancelAction(t *testing.T) {
 		FormItem{Label: "Field", Field: NewTextField("val")},
 	)
 	cancelled := false
-	form.OnCancel(func() tea.Cmd {
+	form.OnCancel(func(f *Form) tea.Cmd {
 		cancelled = true
 		return nil
 	})
 
-	formPressTab(form)
-	formPressTab(form)
+	formPressTab(&form)
+	formPressTab(&form)
 	assert.Equal(t, 2, form.Focused(), "cancel button")
 
-	form.Update(keyPressMsg("enter"))
+	form, _ = form.Update(keyPressMsg("enter"))
 	assert.True(t, cancelled)
 }
 
@@ -98,10 +98,10 @@ func TestForm_NoFields(t *testing.T) {
 	form := NewForm("Done")
 	assert.Equal(t, 0, form.Focused(), "submit button")
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 1, form.Focused(), "cancel button")
 
-	formPressTab(form)
+	formPressTab(&form)
 	assert.Equal(t, 0, form.Focused(), "wraps to submit")
 }
 
@@ -161,7 +161,7 @@ func TestForm_FieldValuesAccessible(t *testing.T) {
 		FormItem{Label: "Name", Field: NewTextField("name")},
 	)
 
-	formTypeText(form, "hello")
+	formTypeText(&form, "hello")
 	assert.Equal(t, "hello", form.TextField(0).Value())
 }
 
@@ -170,13 +170,13 @@ func TestForm_ValidationBlocksSubmitWhenRequiredEmpty(t *testing.T) {
 		FormItem{Label: "Name", Field: NewTextField("name"), Required: true},
 	)
 	submitted := false
-	form.OnSubmit(func() tea.Cmd {
+	form.OnSubmit(func(f *Form) tea.Cmd {
 		submitted = true
 		return nil
 	})
 
-	formFocusSubmit(form)
-	formPressEnter(form)
+	formFocusSubmit(&form)
+	formPressEnter(&form)
 
 	assert.False(t, submitted)
 	assert.True(t, form.HasError())
@@ -188,14 +188,14 @@ func TestForm_ValidationAllowsSubmitWhenRequiredFilled(t *testing.T) {
 		FormItem{Label: "Name", Field: NewTextField("name"), Required: true},
 	)
 	submitted := false
-	form.OnSubmit(func() tea.Cmd {
+	form.OnSubmit(func(f *Form) tea.Cmd {
 		submitted = true
 		return nil
 	})
 
-	formTypeText(form, "hello")
-	formFocusSubmit(form)
-	formPressEnter(form)
+	formTypeText(&form, "hello")
+	formFocusSubmit(&form)
+	formPressEnter(&form)
 
 	assert.True(t, submitted)
 	assert.False(t, form.HasError())
@@ -206,14 +206,14 @@ func TestForm_ValidationTreatsWhitespaceAsEmpty(t *testing.T) {
 		FormItem{Label: "Name", Field: NewTextField("name"), Required: true},
 	)
 	submitted := false
-	form.OnSubmit(func() tea.Cmd {
+	form.OnSubmit(func(f *Form) tea.Cmd {
 		submitted = true
 		return nil
 	})
 
-	formTypeText(form, "   ")
-	formFocusSubmit(form)
-	formPressEnter(form)
+	formTypeText(&form, "   ")
+	formFocusSubmit(&form)
+	formPressEnter(&form)
 
 	assert.False(t, submitted)
 	assert.Equal(t, "Name is required", form.Error())
@@ -223,15 +223,15 @@ func TestForm_ValidationErrorClearsOnInput(t *testing.T) {
 	form := NewForm("Submit",
 		FormItem{Label: "Name", Field: NewTextField("name"), Required: true},
 	)
-	form.OnSubmit(func() tea.Cmd { return nil })
+	form.OnSubmit(func(f *Form) tea.Cmd { return nil })
 
-	formFocusSubmit(form)
-	formPressEnter(form)
+	formFocusSubmit(&form)
+	formPressEnter(&form)
 
 	assert.True(t, form.HasError())
 	assert.Equal(t, 0, form.Focused())
 
-	formTypeText(form, "x")
+	formTypeText(&form, "x")
 
 	assert.False(t, form.HasError())
 }
@@ -242,15 +242,15 @@ func TestForm_ValidationNonRequiredDoesNotBlock(t *testing.T) {
 		FormItem{Label: "Required", Field: NewTextField("req"), Required: true},
 	)
 	submitted := false
-	form.OnSubmit(func() tea.Cmd {
+	form.OnSubmit(func(f *Form) tea.Cmd {
 		submitted = true
 		return nil
 	})
 
-	formPressTab(form) // focus second field
-	formTypeText(form, "filled")
-	formFocusSubmit(form)
-	formPressEnter(form)
+	formPressTab(&form) // focus second field
+	formTypeText(&form, "filled")
+	formFocusSubmit(&form)
+	formPressEnter(&form)
 
 	assert.True(t, submitted)
 	assert.False(t, form.HasError())
@@ -261,12 +261,12 @@ func TestForm_ValidationOnClickSubmit(t *testing.T) {
 		FormItem{Label: "Name", Field: NewTextField("name"), Required: true},
 	)
 	submitted := false
-	form.OnSubmit(func() tea.Cmd {
+	form.OnSubmit(func(f *Form) tea.Cmd {
 		submitted = true
 		return nil
 	})
 
-	formClickSubmit(form)
+	formClickSubmit(&form)
 
 	assert.False(t, submitted)
 	assert.True(t, form.HasError())
@@ -278,10 +278,10 @@ func TestForm_ValidationFocusesFirstError(t *testing.T) {
 		FormItem{Label: "Second", Field: NewTextField("second"), Required: true},
 		FormItem{Label: "Third", Field: NewTextField("third"), Required: true},
 	)
-	form.OnSubmit(func() tea.Cmd { return nil })
+	form.OnSubmit(func(f *Form) tea.Cmd { return nil })
 
-	formFocusSubmit(form)
-	formPressEnter(form)
+	formFocusSubmit(&form)
+	formPressEnter(&form)
 
 	assert.Equal(t, 1, form.Focused(), "focused on first errored field")
 	assert.Equal(t, "Second is required", form.Error())
@@ -297,21 +297,26 @@ func runeKeyMsg(r rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg(tea.Key{Text: string(r), Code: r})
 }
 
+func updateForm(f Form, msg tea.Msg) Form {
+	f, _ = f.Update(msg)
+	return f
+}
+
 func formPressTab(form *Form) {
-	form.Update(keyPressMsg("tab"))
+	*form = updateForm(*form, keyPressMsg("tab"))
 }
 
 func formPressShiftTab(form *Form) {
-	form.Update(keyPressMsg("shift+tab"))
+	*form = updateForm(*form, keyPressMsg("shift+tab"))
 }
 
 func formPressEnter(form *Form) {
-	form.Update(keyPressMsg("enter"))
+	*form = updateForm(*form, keyPressMsg("enter"))
 }
 
 func formTypeText(form *Form, text string) {
 	for _, r := range text {
-		form.Update(runeKeyMsg(r))
+		*form = updateForm(*form, runeKeyMsg(r))
 	}
 }
 
@@ -322,5 +327,5 @@ func formFocusSubmit(form *Form) {
 }
 
 func formClickSubmit(form *Form) {
-	form.Update(MouseEvent{IsClick: true, Target: "submit"})
+	*form = updateForm(*form, MouseEvent{IsClick: true, Target: "submit"})
 }

@@ -15,10 +15,9 @@ const (
 
 type SettingsFormResources struct {
 	settingsFormBase
-	settings docker.ApplicationSettings
 }
 
-func NewSettingsFormResources(settings docker.ApplicationSettings) *SettingsFormResources {
+func NewSettingsFormResources(settings docker.ApplicationSettings) SettingsFormResources {
 	cpuField := NewTextField("e.g. 2")
 	cpuField.SetCharLimit(10)
 	cpuField.SetDigitsOnly(true)
@@ -33,7 +32,7 @@ func NewSettingsFormResources(settings docker.ApplicationSettings) *SettingsForm
 		memoryField.SetValue(strconv.Itoa(settings.Resources.MemoryMB))
 	}
 
-	m := &SettingsFormResources{
+	m := SettingsFormResources{
 		settingsFormBase: settingsFormBase{
 			title: "Resources",
 			form: NewForm("Done",
@@ -41,17 +40,23 @@ func NewSettingsFormResources(settings docker.ApplicationSettings) *SettingsForm
 				FormItem{Label: "Memory Limit (MB)", Field: memoryField},
 			),
 		},
-		settings: settings,
 	}
 
-	m.form.OnSubmit(func() tea.Cmd {
-		m.settings.Resources.CPUs, _ = strconv.Atoi(m.form.TextField(resourcesCPUField).Value())
-		m.settings.Resources.MemoryMB, _ = strconv.Atoi(m.form.TextField(resourcesMemoryField).Value())
-		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: m.settings} }
+	m.form.OnSubmit(func(f *Form) tea.Cmd {
+		s := settings
+		s.Resources.CPUs, _ = strconv.Atoi(f.TextField(resourcesCPUField).Value())
+		s.Resources.MemoryMB, _ = strconv.Atoi(f.TextField(resourcesMemoryField).Value())
+		return func() tea.Msg { return SettingsSectionSubmitMsg{Settings: s} }
 	})
-	m.form.OnCancel(func() tea.Cmd {
+	m.form.OnCancel(func(f *Form) tea.Cmd {
 		return func() tea.Msg { return SettingsSectionCancelMsg{} }
 	})
 
 	return m
+}
+
+func (m SettingsFormResources) Update(msg tea.Msg) (SettingsSection, tea.Cmd) {
+	var cmd tea.Cmd
+	m.settingsFormBase, cmd = m.update(msg)
+	return m, cmd
 }
