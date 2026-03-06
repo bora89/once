@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"text/template"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInstallScriptHandler_ValidImageRefs(t *testing.T) {
@@ -20,9 +22,7 @@ func TestInstallScriptHandler_ValidImageRefs(t *testing.T) {
 	}
 	for _, ref := range valid {
 		w := serve(handler, ref)
-		if w.Code != http.StatusOK {
-			t.Errorf("expected 200 for %q, got %d", ref, w.Code)
-		}
+		assert.Equal(t, http.StatusOK, w.Code, "ref: %s", ref)
 	}
 }
 
@@ -43,9 +43,7 @@ func TestInstallScriptHandler_RejectsShellInjection(t *testing.T) {
 	}
 	for _, ref := range malicious {
 		w := serve(handler, ref)
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400 for %q, got %d", ref, w.Code)
-		}
+		assert.Equal(t, http.StatusBadRequest, w.Code, "ref: %s", ref)
 	}
 }
 
@@ -53,9 +51,7 @@ func TestInstallScriptHandler_EmptyImageRef(t *testing.T) {
 	handler := testHandler()
 
 	w := serve(handler, "")
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200 for empty ref, got %d", w.Code)
-	}
+	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 // Helpers
