@@ -170,17 +170,17 @@ func TestDashboard_ToggleDetails(t *testing.T) {
 	d.updateViewportSize()
 	d.rebuildViewportContent()
 
-	assert.True(t, d.showDetails)
-	fullHeight := d.panels[0].Height(d.showDetails)
+	assert.True(t, dashboardShowDetails)
+	fullHeight := d.panels[0].Height(dashboardShowDetails)
 
 	d, _ = updateDashboard(d, keyPressMsg("d"))
-	assert.False(t, d.showDetails)
-	compactHeight := d.panels[0].Height(d.showDetails)
+	assert.False(t, dashboardShowDetails)
+	compactHeight := d.panels[0].Height(dashboardShowDetails)
 	assert.Less(t, compactHeight, fullHeight)
 
 	// Toggle back
 	d, _ = updateDashboard(d, keyPressMsg("d"))
-	assert.True(t, d.showDetails)
+	assert.True(t, dashboardShowDetails)
 }
 
 func TestDashboard_ToggleDetailsEmptyState(t *testing.T) {
@@ -189,7 +189,7 @@ func TestDashboard_ToggleDetailsEmptyState(t *testing.T) {
 
 	// Should not panic
 	d, _ = updateDashboard(d, keyPressMsg("d"))
-	assert.True(t, d.showDetails) // unchanged — guarded by len(m.apps) > 0
+	assert.True(t, dashboardShowDetails) // unchanged — guarded by len(m.apps) > 0
 }
 
 func TestDashboard_EmptyStateShowsMessage(t *testing.T) {
@@ -219,6 +219,7 @@ func testDashboard(numApps int) Dashboard {
 	dockerScraper := &docker.Scraper{}
 	systemScraper := system.NewScraper(system.ScraperSettings{BufferSize: 10})
 
+	dashboardShowDetails = true
 	return NewDashboard(nil, apps, 0, scraper, dockerScraper, systemScraper, nil)
 }
 

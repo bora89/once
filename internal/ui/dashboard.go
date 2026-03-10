@@ -17,6 +17,8 @@ import (
 	"github.com/basecamp/once/internal/userstats"
 )
 
+var dashboardShowDetails = true
+
 var dashboardKeys = struct {
 	Up       key.Binding
 	Down     key.Binding
@@ -50,10 +52,9 @@ type Dashboard struct {
 	selectedIndex int
 	width, height int
 	viewport      viewport.Model
-	toggling      bool
-	togglingApp   string
-	showDetails   bool
-	progress      Progress
+	toggling    bool
+	togglingApp string
+	progress    Progress
 	help          Help
 	overlay       Component
 }
@@ -84,7 +85,6 @@ func NewDashboard(ns *docker.Namespace, apps []*docker.Application, selectedInde
 		viewport:      vp,
 		header:        NewDashboardHeader(systemScraper),
 		hostname:      hostname,
-		showDetails:   true,
 		progress:      NewProgress(0, Colors.Border),
 		help:          NewHelp(),
 	}
@@ -163,7 +163,7 @@ func (m Dashboard) Update(msg tea.Msg) (Component, tea.Cmd) {
 			return m, func() tea.Msg { return NavigateToLogsMsg{App: m.apps[m.selectedIndex]} }
 		}
 		if key.Matches(msg, dashboardKeys.Details) && len(m.apps) > 0 {
-			m.showDetails = !m.showDetails
+			dashboardShowDetails = !dashboardShowDetails
 			m.updateViewportSize()
 			m.selectPanel(m.selectedIndex)
 			return m, nil
@@ -333,7 +333,7 @@ func (m *Dashboard) rebuildViewportContent() {
 	var views []string
 	for i := range m.panels {
 		toggling := m.toggling && m.togglingApp == m.panels[i].app.Settings.Name
-		views = append(views, m.panels[i].View(i == m.selectedIndex, toggling, m.showDetails, m.width, scales))
+		views = append(views, m.panels[i].View(i == m.selectedIndex, toggling, dashboardShowDetails, m.width, scales))
 	}
 	m.viewport.SetContent(lipgloss.JoinVertical(lipgloss.Left, views...))
 }
@@ -354,9 +354,9 @@ func (m *Dashboard) computeScales() DashboardScales {
 func (m *Dashboard) scrollToSelection() {
 	panelTop := 0
 	for i := range m.selectedIndex {
-		panelTop += m.panels[i].Height(m.showDetails)
+		panelTop += m.panels[i].Height(dashboardShowDetails)
 	}
-	panelBottom := panelTop + m.panels[m.selectedIndex].Height(m.showDetails)
+	panelBottom := panelTop + m.panels[m.selectedIndex].Height(dashboardShowDetails)
 	if panelTop < m.viewport.YOffset() {
 		m.viewport.SetYOffset(panelTop)
 	} else if panelBottom > m.viewport.YOffset()+m.viewport.Height() {
@@ -378,7 +378,7 @@ func (m *Dashboard) panelIndexAtY(y int) (int, bool) {
 	contentRow := vpRow + m.viewport.YOffset()
 	top := 0
 	for i := range m.panels {
-		h := m.panels[i].Height(m.showDetails)
+		h := m.panels[i].Height(dashboardShowDetails)
 		if contentRow < top+h {
 			return i, true
 		}
