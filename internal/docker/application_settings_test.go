@@ -18,7 +18,7 @@ func TestBuildEnvWithSMTP(t *testing.T) {
 		},
 	}
 
-	env := settings.BuildEnv("test-secret-key")
+	env := settings.BuildEnv(ApplicationVolumeSettings{SecretKeyBase: "test-secret-key"})
 
 	assert.Contains(t, env, "SMTP_ADDRESS=smtp.example.com")
 	assert.Contains(t, env, "SMTP_PORT=587")
@@ -30,7 +30,7 @@ func TestBuildEnvWithSMTP(t *testing.T) {
 func TestBuildEnvWithCPULimit(t *testing.T) {
 	settings := ApplicationSettings{Resources: ContainerResources{CPUs: 4}}
 
-	env := settings.BuildEnv("test-secret-key")
+	env := settings.BuildEnv(ApplicationVolumeSettings{SecretKeyBase: "test-secret-key"})
 
 	assert.Contains(t, env, "NUM_CPUS=4")
 }
@@ -38,7 +38,7 @@ func TestBuildEnvWithCPULimit(t *testing.T) {
 func TestBuildEnvWithoutCPULimit(t *testing.T) {
 	settings := ApplicationSettings{}
 
-	env := settings.BuildEnv("test-secret-key")
+	env := settings.BuildEnv(ApplicationVolumeSettings{SecretKeyBase: "test-secret-key"})
 
 	assert.NotContains(t, env, "NUM_CPUS=0")
 }
@@ -46,7 +46,7 @@ func TestBuildEnvWithoutCPULimit(t *testing.T) {
 func TestBuildEnvWithoutSMTP(t *testing.T) {
 	settings := ApplicationSettings{}
 
-	env := settings.BuildEnv("test-secret-key")
+	env := settings.BuildEnv(ApplicationVolumeSettings{SecretKeyBase: "test-secret-key"})
 
 	for _, e := range env {
 		assert.NotContains(t, e, "SMTP_")
@@ -98,6 +98,20 @@ func TestBackupSettingsEqualDiffers(t *testing.T) {
 	assert.False(t, base.Equal(noBackup))
 }
 
+func TestBuildEnvWithVAPIDKeys(t *testing.T) {
+	settings := ApplicationSettings{}
+
+	vol := ApplicationVolumeSettings{
+		SecretKeyBase:   "test-secret-key",
+		VAPIDPublicKey:  "test-vapid-public",
+		VAPIDPrivateKey: "test-vapid-private",
+	}
+	env := settings.BuildEnv(vol)
+
+	assert.Contains(t, env, "VAPID_PUBLIC_KEY=test-vapid-public")
+	assert.Contains(t, env, "VAPID_PRIVATE_KEY=test-vapid-private")
+}
+
 func TestBuildEnvWithEnvVars(t *testing.T) {
 	settings := ApplicationSettings{
 		EnvVars: map[string]string{
@@ -106,7 +120,7 @@ func TestBuildEnvWithEnvVars(t *testing.T) {
 		},
 	}
 
-	env := settings.BuildEnv("test-secret-key")
+	env := settings.BuildEnv(ApplicationVolumeSettings{SecretKeyBase: "test-secret-key"})
 
 	assert.Contains(t, env, "DB_HOST=postgres.local")
 	assert.Contains(t, env, "DB_NAME=mydb")

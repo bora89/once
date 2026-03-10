@@ -9,6 +9,8 @@ ONCE runs on Linux and macOS, and can be used to run applications on a variety o
 
 ONCE comes with a set of 37signals apps built-in, but you can use it to install any compatible Docker image as well.
 
+![Demo](.github/media/install.gif)
+
 ## Installing
 
 The simplest way to get started with ONCE is to use the install snippet to bootstrap the tool and choose an app to install:

@@ -90,9 +90,11 @@ func (s ApplicationSettings) Equal(other ApplicationSettings) bool {
 	return true
 }
 
-func (s ApplicationSettings) BuildEnv(secretKeyBase string) []string {
+func (s ApplicationSettings) BuildEnv(vol ApplicationVolumeSettings) []string {
 	env := []string{
-		"SECRET_KEY_BASE=" + secretKeyBase,
+		"SECRET_KEY_BASE=" + vol.SecretKeyBase,
+		"VAPID_PUBLIC_KEY=" + vol.VAPIDPublicKey,
+		"VAPID_PRIVATE_KEY=" + vol.VAPIDPrivateKey,
 	}
 
 	if !s.TLSEnabled() {

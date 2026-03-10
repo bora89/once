@@ -85,7 +85,15 @@ func (a *Application) Volume(ctx context.Context) (*ApplicationVolume, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generating secret key base: %w", err)
 	}
-	return CreateVolume(ctx, a.namespace, a.Settings.Name, ApplicationVolumeSettings{SecretKeyBase: skb})
+	vapidPub, vapidPriv, err := generateVAPIDKeyPair()
+	if err != nil {
+		return nil, fmt.Errorf("generating VAPID key pair: %w", err)
+	}
+	return CreateVolume(ctx, a.namespace, a.Settings.Name, ApplicationVolumeSettings{
+		SecretKeyBase:   skb,
+		VAPIDPublicKey:  vapidPub,
+		VAPIDPrivateKey: vapidPriv,
+	})
 }
 
 func (a *Application) URL() string {
@@ -304,7 +312,7 @@ func (a *Application) deployWithVolume(ctx context.Context, vol *ApplicationVolu
 
 	containerName := fmt.Sprintf("%s-app-%s-%s", a.namespace.name, a.Settings.Name, id)
 
-	env := a.Settings.BuildEnv(vol.SecretKeyBase())
+	env := a.Settings.BuildEnv(vol.Settings)
 
 	hostConfig := &container.HostConfig{
 		RestartPolicy: container.RestartPolicy{Name: container.RestartPolicyAlways},

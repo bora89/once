@@ -160,7 +160,7 @@ func TestWriteTarEntryAndCopyRoundTrip(t *testing.T) {
 	tw := tar.NewWriter(gw)
 
 	require.NoError(t, writeTarEntry(tw, backupAppSettingsEntry, []byte(`{"name":"app"}`)))
-	require.NoError(t, writeTarEntry(tw, backupVolSettingsEntry, []byte(`{"secretKeyBase":"secret"}`)))
+	require.NoError(t, writeTarEntry(tw, backupVolSettingsEntry, []byte(`{"secretKeyBase":"secret","vapidPublicKey":"pub123","vapidPrivateKey":"priv456"}`)))
 	require.NoError(t, writeTarEntry(tw, "data/file.txt", []byte("file content")))
 
 	require.NoError(t, tw.Close())
@@ -172,5 +172,7 @@ func TestWriteTarEntryAndCopyRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "app", appSettings.Name)
 	assert.Equal(t, "secret", volSettings.SecretKeyBase)
+	assert.Equal(t, "pub123", volSettings.VAPIDPublicKey)
+	assert.Equal(t, "priv456", volSettings.VAPIDPrivateKey)
 	assert.NotEmpty(t, volumeData)
 }

@@ -2,7 +2,9 @@ package docker
 
 import (
 	"context"
+	"crypto/ecdh"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,7 +17,9 @@ import (
 var ErrVolumeNotFound = errors.New("volume not found")
 
 type ApplicationVolumeSettings struct {
-	SecretKeyBase string `json:"secretKeyBase"`
+	SecretKeyBase   string `json:"secretKeyBase"`
+	VAPIDPublicKey  string `json:"vapidPublicKey"`
+	VAPIDPrivateKey string `json:"vapidPrivateKey"`
 }
 
 func UnmarshalApplicationVolumeSettings(s string) (ApplicationVolumeSettings, error) {
@@ -108,4 +112,16 @@ func generateSecretKeyBase() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+func generateVAPIDKeyPair() (publicKey, privateKey string, err error) {
+	key, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		return "", "", err
+	}
+
+	privateKey = base64.RawURLEncoding.EncodeToString(key.Bytes())
+	publicKey = base64.RawURLEncoding.EncodeToString(key.PublicKey().Bytes())
+
+	return publicKey, privateKey, nil
 }
