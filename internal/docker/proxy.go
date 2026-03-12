@@ -79,6 +79,14 @@ func (p *Proxy) Boot(ctx context.Context, settings ProxySettings) error {
 		settings.MetricsPort = DefaultMetricsPort
 	}
 
+	info, err := p.namespace.client.ContainerInspect(ctx, p.containerName())
+	if err == nil {
+		return p.ensureRunning(ctx, info)
+	}
+	if !errdefs.IsNotFound(err) {
+		return fmt.Errorf("inspecting proxy container: %w", err)
+	}
+
 	reader, err := p.namespace.client.ImagePull(ctx, proxyImage, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("pulling proxy image: %w", err)
@@ -180,6 +188,25 @@ func (p *Proxy) containerName() string {
 }
 
 // Private
+
+func (p *Proxy) ensureRunning(ctx context.Context, info container.InspectResponse) error {
+	if !info.State.Running {
+		if err := p.namespace.client.ContainerStart(ctx, info.ID, container.StartOptions{}); err != nil {
+			return fmt.Errorf("starting proxy container: %w", err)
+		}
+	}
+
+	label := info.Config.Labels[labelKey]
+	if label != "" {
+		settings, err := UnmarshalProxySettings(label)
+		if err != nil {
+			return fmt.Errorf("unmarshalling proxy settings: %w", err)
+		}
+		p.Settings = &settings
+	}
+
+	return nil
+}
 
 func (p *Proxy) deployArgs(opts DeployOptions) []string {
 	args := []string{"kamal-proxy", "deploy", opts.AppName, "--target", opts.Target, "--deploy-timeout", deployTimeout}

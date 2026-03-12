@@ -144,13 +144,7 @@ func (n *Namespace) Setup(ctx context.Context) error {
 		return err
 	}
 
-	if n.proxy.Settings == nil {
-		if err := n.proxy.Boot(ctx, ProxySettings{}); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return n.proxy.Boot(ctx, ProxySettings{})
 }
 
 func (n *Namespace) EnsureNetwork(ctx context.Context) error {
